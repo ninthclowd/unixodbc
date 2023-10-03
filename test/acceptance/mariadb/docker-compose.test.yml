@@ -1,0 +1,28 @@
+---
+version: "3.8"
+services:
+  sut:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    volumes:
+      - ../../../:/usr/src/unixodbc
+    environment:
+      DB_HOST: mariadb
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    command: go test -v -coverpkg=./... -coverprofile=coverage.out -tags acceptance ./test/acceptance/mariadb
+  mariadb:
+    image: "mariadb"
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: test
+      MYSQL_TCP_PORT: 3306
+    healthcheck:
+      test: mysqladmin ping -h 127.0.0.1 -u root --password=test
+      start_period: 5s
+      interval: 5s
+      timeout: 5s
+      retries: 55

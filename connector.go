@@ -3,131 +3,131 @@ package unixodbc
 import (
 	"context"
 	"database/sql/driver"
+	"errors"
+	"github.com/ninthclowd/unixodbc/internal/cache"
+	"github.com/ninthclowd/unixodbc/internal/odbc"
+	"io"
 )
 
-var _ ConnectionStringFactory = (*staticString)(nil)
+// StaticConnStr converts a static connection string into ConnectionStringFactory usable by Connector
+type StaticConnStr string
 
-type staticString struct {
-	string
-}
-
-func (s *staticString) ConnectionString() (string, error) {
-	return s.string, nil
+func (s StaticConnStr) ConnectionString() (string, error) {
+	return string(s), nil
 }
 
 type ConnectionStringFactory interface {
 	ConnectionString() (string, error)
 }
 
-var _ driver.Connector = (*connector)(nil)
+var _ driver.Connector = (*Connector)(nil)
+var _ io.Closer = (*Connector)(nil)
 
-type connector struct {
-	initError error
-	factory   ConnectionStringFactory
-	tracer    Tracer
-	config    *EnvConfig
+// Connector can be used with sql.OpenDB to allow more control of the unixodbc driver
+type Connector struct {
+	//ConnectionString is a factory that generates connection strings for each new connection that is opened.
+	//Use StaticConnStr if you have a static connection string that does not need to change with each new connection.
+	//Ex: If you are connecting using a system DSN called "myDatabase", this could be:
+	//	StaticConnStr("DSN=myDatabase")
+	ConnectionString   ConnectionStringFactory
+	StatementCacheSize int
+
+	UseODBCCursor bool   //SQL_ATTR_ODBC_CURSORS TODO
+	PacketSize    uint32 //SQL_ATTR_PACKET_SIZE TODO
+	TraceFile     string //SQL_ATTR_TRACEFILE TODO
+
+	odbcEnvironment *odbc.Environment
 }
 
-type Option func(conn *connector) error
-
-func Connector(options ...Option) driver.Connector {
-	c := new(connector)
-	for _, option := range options {
-		c.initError = option(c)
-		if c.initError != nil {
-			return c
-		}
-	}
-	return c
+// Close implements io.Closer
+func (c *Connector) Close() error {
+	return c.odbcEnvironment.Close()
 }
 
-func WithConnectionStringFactory(factory ConnectionStringFactory) Option {
-	return func(conn *connector) error {
-		conn.factory = factory
+func (c *Connector) initEnvironment(ctx context.Context) (err error) {
+	if c.odbcEnvironment != nil {
 		return nil
 	}
-}
-func WithConnectionString(connStr string) Option {
-	return func(conn *connector) error {
-		conn.factory = &staticString{connStr}
-		return nil
-	}
-}
+	var env *odbc.Environment
 
-func WithEnvConfig(config *EnvConfig) Option {
-	return func(conn *connector) error {
-		conn.config = config
-		return nil
+	ctx, trace := Tracer.NewTask(ctx, "Connection::initEnvironment")
+	defer trace.End()
+
+	Tracer.WithRegion(ctx, "initializing ODBC environment", func() {
+		env, err = odbc.NewEnvironment(nil)
+	})
+	if err != nil {
+		return
 	}
+
+	Tracer.WithRegion(ctx, "setting version", func() {
+		err = env.SetVersion(odbc.Version3_80)
+	})
+	if err != nil {
+		return
+	}
+
+	//do not enable connection pooling at the driver level since go sql will be managing a connection pool
+	Tracer.WithRegion(ctx, "setting pool option", func() {
+		err = env.SetPoolOption(odbc.PoolOff)
+	})
+	if err != nil {
+		return
+	}
+
+	//if err = env.SetTraceFile(c.TraceFile); err != nil {
+	//	return
+	//}
+
+	c.odbcEnvironment = env
+	return
 }
 
 // Connect implements driver.Connector
-func (c *connector) Connect(ctx context.Context) (driver.Conn, error) {
+func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
+	ctx, trace := Tracer.NewTask(ctx, "Connect")
+	defer trace.End()
 
-	if c.initError != nil {
-		return nil, c.initError
+	var err error
+	if err = c.initEnvironment(ctx); err != nil {
+		return nil, err
 	}
 
-	hndEnv, err := env(c.config)
+	if c.ConnectionString == nil {
+		return nil, errors.New("ConnectionString is required")
+	}
+
+	var connStr string
+	Tracer.WithRegion(ctx, "generating connection string", func() {
+		connStr, err = c.ConnectionString.ConnectionString()
+	})
 	if err != nil {
 		return nil, err
 	}
-	trace := tracer.Start(ctx, "Connect")
-	defer trace.End()
 
-	type result struct {
-		conn *conn
-		err  error
+	conn := &Connection{
+		connector: c,
+		cachedStatements: cache.NewLRU[PreparedStatement](c.StatementCacheSize, func(key string, value *PreparedStatement) error {
+			return value.odbcStatement.Close()
+		}),
 	}
 
-	ch := make(chan *result)
+	Tracer.WithRegion(ctx, "connecting", func() {
+		conn.odbcConnection, err = c.odbcEnvironment.Connect(ctx, connStr)
+	})
 
-	go func() {
-
-		cn, err := hndEnv.Connection()
-		if err != nil {
-			ch <- &result{conn: nil, err: err}
-			return
-		}
-		connStr, err := c.factory.ConnectionString()
-		if err != nil {
-			defer cn.Free()
-			ch <- &result{conn: nil, err: err}
-			return
-		}
-
-		if err := cn.DriverConnect(connStr); err != nil {
-			defer cn.Free()
-			ch <- &result{conn: nil, err: err}
-			return
-		}
-
-		connection := &conn{
-			psCache: psCache{
-				cache: make(map[string]*cachedStatement),
-			},
-			connector: c,
-			hnd:       cn,
-			invalid:   false,
-		}
-
-		if err = ctx.Err(); err != nil {
-			connection.Close()
-			return
-		}
-
-		ch <- &result{conn: connection, err: nil}
-	}()
-
-	select {
-	case res := <-ch:
-		return res.conn, res.err
-	case <-ctx.Done():
-		return nil, ctx.Err()
+	if err != nil {
+		return nil, err
 	}
+	if err = conn.odbcConnection.SetAutoCommit(true); err != nil {
+		return nil, err
+	}
+
+	return conn, nil
+
 }
 
 // Driver implements driver.Connector
-func (c *connector) Driver() driver.Driver {
+func (c *Connector) Driver() driver.Driver {
 	return driverInstance
 }

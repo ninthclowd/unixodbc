@@ -1,0 +1,13 @@
+name: docker
+on: [push]
+
+jobs:
+  test-mariadb:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: MariaDB acceptance tests
+        run: docker compose --file test/acceptance/mariadb/docker-compose.test.yml run sut
+        with:
+          name: Coverage
+          path: coverage.out
