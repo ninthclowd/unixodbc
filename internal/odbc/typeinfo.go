@@ -14,7 +14,7 @@ type TypeInfo struct {
 	Searchable             api.SQLSMALLINT `col_name:"SEARCHABLE"`
 	IsUnsigned             api.SQLUINTEGER `col_name:"UNSIGNED_ATTRIBUTE"`
 	FixedPrecisionAndScale api.SQLUINTEGER `col_name:"FIXED_PREC_SCALE"`
-	IsAutoIncrementing     api.SQLUINTEGER `col_name:"AUTO_UNIQUE"`
+	IsAutoIncrementing     api.SQLUINTEGER `col_name:"AUTO_UNIQUE_VALUE"`
 	LocalTypeName          string          `col_name:"LOCAL_TYPE_NAME"`
 	MinimumScale           api.SQLSMALLINT `col_name:"MINIMUM_SCALE"`
 	MaximumScale           api.SQLSMALLINT `col_name:"MAXIMUM_SCALE"`
