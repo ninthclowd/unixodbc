@@ -36,11 +36,6 @@ func TestParameterBinding(t *testing.T) {
 			arg:         int64(math.MaxInt64),
 		},
 		{
-			description: "it should bind a float32",
-			sql:         "SELECT 1 WHERE ? = 52.42",
-			arg:         float32(52.42),
-		},
-		{
 			description: "it should bind a float64",
 			sql:         "SELECT 1 WHERE ? = 52.42",
 			arg:         52.42,
@@ -70,7 +65,17 @@ func TestParameterBinding(t *testing.T) {
 			sql:         `SELECT 1 WHERE ? IS NULL`,
 			arg:         nil,
 		},
-		//TODO: binary
+
+		{
+			description: "it should bind a nil value",
+			sql:         `SELECT 1 WHERE ? IS NULL`,
+			arg:         nil,
+		},
+		{
+			description: "it should bind a binary value",
+			sql:         `SELECT 1 WHERE ? = CAST('FOO' AS BINARY)`,
+			arg:         []byte("FOO"),
+		},
 	}
 
 	for _, test := range tests {

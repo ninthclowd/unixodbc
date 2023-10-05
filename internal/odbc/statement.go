@@ -153,8 +153,6 @@ func (s *Statement) bindParam(index int, value interface{}) error {
 		return s.bindInt32(index, value.(int32))
 	case int64:
 		return s.bindInt64(index, value.(int64))
-	case float32:
-		return s.bindFloat32(index, value.(float32))
 	case float64:
 		return s.bindFloat64(index, value.(float64))
 	case []byte:

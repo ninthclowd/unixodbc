@@ -42,12 +42,3 @@ func (c *columnFloat32) Value() (driver.Value, error) {
 	}
 	return float32(value), nil
 }
-
-func (s *Statement) bindFloat32(index int, value float32) error {
-	_, err := s.result(s.api().SQLBindParameter((api.SQLHSTMT)(s.hnd()), api.SQLUSMALLINT(index+1), api.SQL_PARAM_INPUT,
-		api.SQL_C_FLOAT, api.SQL_REAL,
-		0, 0,
-		api.SQLPOINTER(&value),
-		0, nil))
-	return err
-}

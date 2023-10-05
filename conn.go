@@ -54,7 +54,7 @@ func (c *Connection) ResetSession(ctx context.Context) error {
 // CheckNamedValue implements driver.NamedValueChecker
 func (c *Connection) CheckNamedValue(value *driver.NamedValue) error {
 	switch value.Value.(type) {
-	case float32, float64, int8, int16, int32, int64, string, bool, nil, time.Time, []byte:
+	case float64, int8, int16, int32, int64, string, bool, nil, time.Time, []byte:
 		return nil
 	default:
 		return driver.ErrRemoveArgument
