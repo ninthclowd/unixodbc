@@ -2,7 +2,7 @@ name: Go
 on: [push]
 jobs:
   build:
-    name: Build
+    name: Unit Tests
     runs-on: ubuntu-latest
     steps:
       - name: Setup go
@@ -12,7 +12,7 @@ jobs:
         id: go
 
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Get dependencies
         run: |
@@ -22,3 +22,11 @@ jobs:
         env:
           GOPROXY: "https://proxy.golang.org"
         run: go test -v .
+  mariadb_test:
+    name: MariaDB Acceptance Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Run acceptance tests
+        run: docker compose run --rm mariadb_test
