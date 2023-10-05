@@ -36,7 +36,7 @@ func (c *columnUTF8) Decimal() (precision int64, scale int64, ok bool) {
 }
 
 func (c *columnUTF8) Value() (driver.Value, error) {
-	value := make([]byte, c.columnSize)
+	value := make([]byte, c.columnSize+1)
 	var valueLength api.SQLLEN
 	if _, err := c.result(c.api().SQLGetData(api.SQLHSTMT(c.hnd()), c.columnNumber, api.SQL_C_CHAR, api.SQLPOINTER(&value[0]), api.SQLLEN(len(value)), &valueLength)); err != nil {
 		return nil, err
