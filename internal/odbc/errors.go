@@ -13,24 +13,19 @@ var (
 	//ErrConnectionDead   = errors.New("Connection dead")
 )
 
-type MultipleErrors map[string]error
+type ErrorMap map[string]error
 
-func (m MultipleErrors) Err() error {
-	var combinedErrMsg string
+func (m ErrorMap) Err() error {
+	if len(m) == 0 {
+		return nil
+	}
+	errs := make([]error, len(m))
+	idx := 0
 	for desc, err := range m {
-		if err != nil {
-			//TODO in go1.20 use errors.join and implement unwrap
-			if combinedErrMsg == "" {
-				combinedErrMsg = fmt.Sprintf("%s: %s", desc, err.Error())
-			} else {
-				combinedErrMsg = fmt.Sprintf("\n%s: %s", desc, err.Error())
-			}
-		}
+		errs[idx] = fmt.Errorf("%s: %w", desc, err)
+		idx++
 	}
-	if combinedErrMsg != "" {
-		return errors.New(combinedErrMsg)
-	}
-	return nil
+	return errors.Join(errs...)
 }
 
 type DiagRec struct {

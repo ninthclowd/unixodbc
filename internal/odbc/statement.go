@@ -53,7 +53,7 @@ func (s *Statement) ExecDirect(ctx context.Context, sql string) error {
 	case err := <-result:
 		return err
 	case <-ctx.Done():
-		errs := make(MultipleErrors)
+		errs := make(ErrorMap)
 		errs["cancelling statement"] = s.cancel()
 		errs["context"] = ctx.Err()
 		return errs.Err()
@@ -71,7 +71,7 @@ func (s *Statement) Execute(ctx context.Context) error {
 	case err := <-result:
 		return err
 	case <-ctx.Done():
-		errs := make(MultipleErrors)
+		errs := make(ErrorMap)
 		errs["cancelling statement"] = s.cancel()
 		errs["context"] = ctx.Err()
 		return errs.Err()
@@ -90,7 +90,7 @@ func (s *Statement) Prepare(ctx context.Context, sql string) error {
 	case err := <-result:
 		return err
 	case <-ctx.Done():
-		errs := make(MultipleErrors)
+		errs := make(ErrorMap)
 		errs["cancelling statement"] = s.cancel()
 		errs["context"] = ctx.Err()
 		return errs.Err()

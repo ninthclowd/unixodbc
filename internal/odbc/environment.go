@@ -104,7 +104,7 @@ func (e *Environment) Connect(ctx context.Context, connStr string) (*Connection,
 	case err = <-result:
 		return &Connection{handle: hnd, env: e}, err
 	case <-ctx.Done():
-		errs := make(MultipleErrors)
+		errs := make(ErrorMap)
 		errs["cancel"] = hnd.cancel()
 		errs["free"] = hnd.free()
 		errs["context"] = ctx.Err()
