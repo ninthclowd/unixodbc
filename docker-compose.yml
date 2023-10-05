@@ -11,7 +11,7 @@ services:
     depends_on:
       mariadb:
         condition: service_healthy
-    command: go test -v -coverpkg=./... -coverprofile=coverage.out -tags acceptance ./test/acceptance/mariadb
+    command: go test -race -coverpkg=./... -coverprofile=./test/acceptance/mariadb/coverage.out -tags acceptance ./test/acceptance/mariadb
 
   mariadb:
     image: "mariadb:10.9-jammy"

@@ -121,12 +121,19 @@ func TestConnection_ExecContext_Cancel(t *testing.T) {
 	_, conn, ctx, finish := newTestConnection(t)
 	defer finish()
 
-	execCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+	start := time.Now()
+	_, err := conn.ExecContext(ctx, "SELECT SLEEP(1)")
+	elapsed := time.Since(start)
+	if elapsed.Seconds() < 1 {
+		t.Error("sleep validation query returned before 1 second")
+	}
+
+	execCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
 	defer cancel()
 
-	start := time.Now()
-	_, err := conn.ExecContext(execCtx, "SELECT SLEEP(5)")
-	elapsed := time.Since(start)
+	start = time.Now()
+	_, err = conn.ExecContext(execCtx, "SELECT SLEEP(5)")
+	elapsed = time.Since(start)
 	if elapsed.Seconds() > 1 {
 		t.Fatalf("query did not return immediately when cancelled")
 	}
@@ -134,22 +141,39 @@ func TestConnection_ExecContext_Cancel(t *testing.T) {
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("expected error to be a context error. got: %s", err.Error())
 	}
+
+	_, err = conn.ExecContext(ctx, "SELECT 1")
+	if err != nil {
+		t.Errorf("expected no error from subsequent exec, got: %s", err.Error())
+	}
 }
 
 func TestConnection_QueryContext_Cancel(t *testing.T) {
 	_, conn, ctx, finish := newTestConnection(t)
 	defer finish()
 
-	execCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+	start := time.Now()
+	_, err := conn.ExecContext(ctx, "SELECT SLEEP(1)")
+	elapsed := time.Since(start)
+	if elapsed.Seconds() < 1 {
+		t.Error("sleep validation query returned before 1 second")
+	}
+
+	execCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
 	defer cancel()
 
-	start := time.Now()
-	_, err := conn.QueryContext(execCtx, "SELECT SLEEP(5)")
-	elapsed := time.Since(start)
+	start = time.Now()
+	_, err = conn.QueryContext(execCtx, "SELECT SLEEP(2)")
+	elapsed = time.Since(start)
 	if elapsed.Seconds() > 1 {
 		t.Fatalf("query did not return immediately when cancelled")
 	}
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("expected error to be a context error.  got: %s", err.Error())
+	}
+
+	_, err = conn.QueryContext(ctx, "SELECT 1")
+	if err != nil {
+		t.Errorf("expected no error from subsequent query, got: %s", err.Error())
 	}
 }
