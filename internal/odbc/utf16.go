@@ -2,6 +2,7 @@ package odbc
 
 import (
 	"database/sql/driver"
+	"encoding/binary"
 	"github.com/ninthclowd/unixodbc/internal/api"
 	"reflect"
 	"unicode/utf16"
@@ -37,7 +38,8 @@ func (c *columnUTF16) Decimal() (precision int64, scale int64, ok bool) {
 }
 
 func (c *columnUTF16) Value() (driver.Value, error) {
-	value := make([]uint16, c.columnSize)
+	utfLength := c.columnSize * 2
+	value := make([]byte, utfLength+1)
 	var valueLength api.SQLLEN
 	if _, err := c.result(c.api().SQLGetData(api.SQLHSTMT(c.hnd()), c.columnNumber, api.SQL_C_WCHAR, api.SQLPOINTER(&value[0]), api.SQLLEN(len(value)), &valueLength)); err != nil {
 		return nil, err
@@ -46,8 +48,7 @@ func (c *columnUTF16) Value() (driver.Value, error) {
 		return nil, nil
 	}
 
-	utfLength := valueLength / 2
-	str := string(utf16.Decode(value[:utfLength]))
+	str := utf16String(value[:valueLength])
 	return str, nil
 }
 
@@ -69,4 +70,12 @@ func (s *Statement) bindUTF16(index int, src string) error {
 		api.SQLPOINTER(&val[0]),
 		0, &execSize))
 	return err
+}
+
+func utf16String(b []byte) string {
+	utf := make([]uint16, len(b)/2)
+	for i := 0; i < len(b); i += 2 {
+		utf[i/2] = binary.LittleEndian.Uint16(b[i:])
+	}
+	return string(utf16.Decode(utf))
 }
