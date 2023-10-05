@@ -125,7 +125,7 @@ func TestConnection_ExecContext_Cancel(t *testing.T) {
 	defer cancel()
 
 	start := time.Now()
-	_, err := conn.ExecContext(execCtx, "SELECT SLEEP(10)")
+	_, err := conn.ExecContext(execCtx, "SELECT SLEEP(5)")
 	elapsed := time.Since(start)
 	if elapsed.Seconds() > 1 {
 		t.Fatalf("query did not return immediately when cancelled")
@@ -144,7 +144,7 @@ func TestConnection_QueryContext_Cancel(t *testing.T) {
 	defer cancel()
 
 	start := time.Now()
-	_, err := conn.QueryContext(execCtx, "SELECT SLEEP(10)")
+	_, err := conn.QueryContext(execCtx, "SELECT SLEEP(5)")
 	elapsed := time.Since(start)
 	if elapsed.Seconds() > 1 {
 		t.Fatalf("query did not return immediately when cancelled")
