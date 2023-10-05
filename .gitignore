@@ -5,3 +5,5 @@ cov.html
 # vendor/
 
 /local/
+
+/test/acceptance/netsuite
