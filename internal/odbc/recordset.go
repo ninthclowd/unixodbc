@@ -41,7 +41,7 @@ func (rs *RecordSet) Unmarshal(out interface{}) error {
 		}
 		col, found := rs.columns.byName[mappedColumnName]
 		if !found {
-			return fmt.Errorf("mapping [%s]: invalid column name [%s]", property.Name, mappedColumnName)
+			continue
 		}
 
 		rawDBValue, err := col.Value()
