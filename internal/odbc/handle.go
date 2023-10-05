@@ -126,11 +126,28 @@ func (h *handleImpl) getDiagRecs() ([]*DiagRec, error) {
 		if ret == api.SQL_ERROR {
 			return nil, fmt.Errorf("SQLGetDiagRecW returned SQL_ERROR")
 		}
-		records = append(records, &DiagRec{
+
+		rec := &DiagRec{
 			State:     string(utf16.Decode(sqlState)),
 			ErrorCode: int(nativeError),
-			Message:   string(utf16.Decode(messageText[:msgSize*2])),
-		})
+		}
+
+		if msgSize == 0 {
+			rec.Message = nullTerminatedString(utf16.Decode(messageText))
+		} else {
+			rec.Message = string(utf16.Decode(messageText[:msgSize]))
+		}
+
+		records = append(records, rec)
 	}
 	return records, nil
+}
+
+func nullTerminatedString(s []rune) string {
+	for i, r := range s {
+		if r == 0 {
+			return string(s[:i])
+		}
+	}
+	return string(s)
 }
