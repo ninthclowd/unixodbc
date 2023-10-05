@@ -1,4 +1,4 @@
-FROM golang:1.20-bookworm as base
+FROM golang:1.21-bookworm as base
 RUN apt update
 RUN apt-get install -y libssl-dev unixodbc-dev unixodbc odbcinst
 
@@ -17,16 +17,13 @@ RUN install -d /usr/local/lib/mariadb/plugin/
 RUN install lib/mariadb/plugin/* /usr/local/lib/mariadb/plugin/
 RUN ldconfig
 
-
 WORKDIR /usr/src/odbc
-COPY odbcinst.ini .
+COPY test/acceptance/mariadb/odbcinst.ini .
 RUN odbcinst -i -d -f odbcinst.ini
-COPY odbc.ini .
+COPY test/acceptance/mariadb/odbc.ini .
 RUN odbcinst -i -s -l -f odbc.ini
 
 WORKDIR /usr/src/unixodbc
-
-CMD ["bash"]
 
 
 

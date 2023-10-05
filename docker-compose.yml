@@ -1,22 +1,22 @@
----
 version: "3.8"
 services:
-  sut:
+  mariadb_test:
     build:
       context: .
-      dockerfile: Dockerfile.test
+      dockerfile: test/acceptance/mariadb/Dockerfile
     volumes:
-      - ../../../:/usr/src/unixodbc
+      - .:/usr/src/unixodbc
     environment:
       DB_HOST: mariadb
     depends_on:
       mariadb:
         condition: service_healthy
     command: go test -v -coverpkg=./... -coverprofile=coverage.out -tags acceptance ./test/acceptance/mariadb
+
   mariadb:
-    image: "mariadb"
+    image: "mariadb:10.9-jammy"
     ports:
-      - "3306:3306"
+      - "3306"
     environment:
       MYSQL_ROOT_PASSWORD: test
       MYSQL_TCP_PORT: 3306
