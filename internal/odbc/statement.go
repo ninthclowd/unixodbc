@@ -46,7 +46,10 @@ func (s *Statement) ExecDirect(ctx context.Context, sql string) error {
 	go func() {
 		statementBytes := utf16.Encode([]rune(sql))
 		_, err := s.result(s.api().SQLExecDirect(api.SQLHSTMT(s.hnd()), statementBytes, api.SQLINTEGER(len(statementBytes))))
-		result <- err
+		if ctx.Err() == nil {
+			result <- err
+		}
+		close(result)
 	}()
 
 	select {
@@ -64,7 +67,10 @@ func (s *Statement) Execute(ctx context.Context) error {
 	result := make(chan error, 1)
 	go func() {
 		_, err := s.result(s.api().SQLExecute(api.SQLHSTMT(s.hnd())))
-		result <- err
+		if ctx.Err() == nil {
+			result <- err
+		}
+		close(result)
 	}()
 
 	select {
@@ -83,7 +89,10 @@ func (s *Statement) Prepare(ctx context.Context, sql string) error {
 	go func() {
 		statementBytes := utf16.Encode([]rune(sql))
 		_, err := s.result(s.api().SQLPrepare(api.SQLHSTMT(s.hnd()), statementBytes, api.SQLINTEGER(len(statementBytes))))
-		result <- err
+		if ctx.Err() == nil {
+			result <- err
+		}
+		close(result)
 	}()
 
 	select {

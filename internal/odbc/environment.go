@@ -97,7 +97,10 @@ func (e *Environment) Connect(ctx context.Context, connStr string) (*Connection,
 			0,
 			nil,
 			api.SQL_DRIVER_NOPROMPT))
-		result <- err
+		if ctx.Err() == nil {
+			result <- err
+		}
+		close(result)
 	}()
 
 	select {
