@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/ninthclowd/unixodbc/internal/api"
+	"sync"
 	"unicode/utf16"
 )
 
@@ -34,6 +35,7 @@ type handleImpl struct {
 	cAPI    odbcAPI
 	ptr     api.SQLHANDLE
 	ptrType api.SQLSMALLINT
+	ptrMux  sync.RWMutex
 }
 
 func newEnvHandle(cAPI odbcAPI) (handle, error) {
@@ -53,6 +55,8 @@ func (h *handleImpl) api() odbcAPI {
 }
 
 func (h *handleImpl) hnd() api.SQLHANDLE {
+	h.ptrMux.RLock()
+	defer h.ptrMux.RUnlock()
 	return h.ptr
 }
 
@@ -61,19 +65,18 @@ func (h *handleImpl) hndType() api.SQLSMALLINT {
 }
 
 func (h *handleImpl) cancel() error {
-	if h.ptr == nil {
-		return ErrHandleFreed
-	}
-	_, err := h.result(h.cAPI.SQLCancelHandle(h.ptrType, h.ptr))
+	_, err := h.result(h.cAPI.SQLCancelHandle(h.ptrType, h.hnd()))
 	return err
 }
 
 func (h *handleImpl) free() error {
+	h.ptrMux.Lock()
+	defer h.ptrMux.Unlock()
 	if h.ptr == nil {
 		return ErrHandleFreed
 	}
-	if _, err := h.result(h.cAPI.SQLFreeHandle(h.ptrType, h.ptr)); err != nil {
-		return fmt.Errorf("freeing handleImpl: %w", err)
+	if code := h.cAPI.SQLFreeHandle(h.ptrType, h.ptr); code != api.SQL_SUCCESS {
+		return fmt.Errorf("received code %d when freeing handle", code)
 	}
 	h.ptr = nil
 	return nil
@@ -81,16 +84,13 @@ func (h *handleImpl) free() error {
 
 func (h *handleImpl) child(handleType api.SQLSMALLINT) (handle, error) {
 	hnd := &handleImpl{cAPI: h.cAPI, ptrType: handleType}
-	if _, err := h.result(h.cAPI.SQLAllocHandle(handleType, h.ptr, &hnd.ptr)); err != nil {
+	if _, err := h.result(h.cAPI.SQLAllocHandle(handleType, h.hnd(), &hnd.ptr)); err != nil {
 		return nil, err
 	}
 	return hnd, nil
 }
 
 func (h *handleImpl) result(r api.SQLRETURN) (api.SQLRETURN, error) {
-	if h.ptr == nil {
-		return r, ErrHandleFreed
-	}
 	if err, found := errorMap[r]; found {
 		return r, err
 	}
@@ -111,7 +111,7 @@ func (h *handleImpl) getDiagRecs() ([]*DiagRec, error) {
 		var msgSize api.SQLSMALLINT
 		recordNumber := api.SQLSMALLINT(i)
 
-		ret := h.cAPI.SQLGetDiagRecW(h.ptrType, h.ptr,
+		ret := h.cAPI.SQLGetDiagRecW(h.ptrType, h.hnd(),
 			recordNumber,
 			&sqlState,
 			&nativeError,
