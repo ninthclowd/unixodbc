@@ -2,7 +2,6 @@ package odbc
 
 import (
 	"context"
-	"errors"
 	"github.com/golang/mock/gomock"
 	"github.com/ninthclowd/unixodbc/internal/api"
 	"strings"
@@ -13,13 +12,8 @@ import (
 
 func newTestStatement(t *testing.T) (stmt *Statement, ctrl *gomock.Controller, mockAPI *MockAPI, mockHnd *MockHandle) {
 	ctrl = gomock.NewController(t)
-	var hnd = api.SQLHANDLE(new(string))
 	mockAPI = NewMockAPI(ctrl)
-	mockHnd = NewMockHandle(ctrl)
-	mockHnd.EXPECT().api().Return(mockAPI).AnyTimes()
-	mockHnd.EXPECT().result(api.SQLRETURN(api.SQL_SUCCESS)).Return(api.SQLRETURN(api.SQL_SUCCESS), nil).AnyTimes()
-	mockHnd.EXPECT().result(api.SQLRETURN(api.SQL_ERROR)).Return(api.SQLRETURN(api.SQL_ERROR), errors.New("mock error")).AnyTimes()
-	mockHnd.EXPECT().hnd().Return(hnd).AnyTimes()
+	mockHnd = newTestHandle(ctrl, mockAPI)
 	stmt = &Statement{
 		handle: mockHnd,
 		conn:   nil,
@@ -124,7 +118,7 @@ func TestStatement_Execute_Cancel(t *testing.T) {
 		return api.SQL_SUCCESS
 	})
 
-	mockHnd.EXPECT().cancel().Return(nil)
+	mockHnd.EXPECT().cancel().Return(nil).Times(1)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Millisecond)
 	defer cancel()
@@ -169,7 +163,7 @@ func TestStatement_ExecDirect_Cancel(t *testing.T) {
 		return api.SQL_SUCCESS
 	})
 
-	mockHnd.EXPECT().cancel().Return(nil)
+	mockHnd.EXPECT().cancel().Return(nil).Times(1)
 
 	start := time.Now()
 	if gotErr := stmt.ExecDirect(ctx, sql); !strings.Contains(gotErr.Error(), context.DeadlineExceeded.Error()) {
