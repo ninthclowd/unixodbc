@@ -2,17 +2,45 @@
 package odbc
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/ninthclowd/unixodbc/internal/api"
+	"runtime"
 	"sync"
 	"unicode/utf16"
 )
+
+func init() {
+	runtime.LockOSThread()
+}
 
 var (
 	ErrInvalidHandle = errors.New("invalid handleImpl")
 	ErrHandleFreed   = errors.New("attempt to double free")
 )
+
+func cancelHandleOnContext(ctx context.Context, h handle) (done func()) {
+	var wg sync.WaitGroup
+	closer := make(chan struct{}, 1)
+
+	done = func() {
+		close(closer)
+		wg.Wait()
+	}
+
+	wg.Add(1)
+	go func() {
+		select {
+		case <-ctx.Done():
+			_ = h.cancel()
+		case <-closer:
+		}
+		wg.Done()
+	}()
+
+	return
+}
 
 var errorMap = map[api.SQLRETURN]error{
 	api.SQL_SUCCESS:           nil,
@@ -45,7 +73,7 @@ func newEnvHandle(cAPI odbcAPI) (handle, error) {
 	}
 
 	if r := cAPI.SQLAllocHandle(api.SQL_HANDLE_ENV, nil, &hnd.ptr); r == api.SQL_ERROR {
-		return nil, fmt.Errorf("unable to alloc env handleImpl: %d", (int)(r))
+		return nil, fmt.Errorf("unable to alloc env handle: %d", (int)(r))
 	}
 	return hnd, nil
 }
@@ -65,8 +93,10 @@ func (h *handleImpl) hndType() api.SQLSMALLINT {
 }
 
 func (h *handleImpl) cancel() error {
-	_, err := h.result(h.cAPI.SQLCancelHandle(h.ptrType, h.hnd()))
-	return err
+	if code := h.cAPI.SQLCancelHandle(h.ptrType, h.hnd()); code != api.SQL_SUCCESS {
+		return fmt.Errorf("received code %d when cancelling handle", code)
+	}
+	return nil
 }
 
 func (h *handleImpl) free() error {

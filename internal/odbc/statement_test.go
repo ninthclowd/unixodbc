@@ -2,6 +2,7 @@ package odbc
 
 import (
 	"context"
+	"errors"
 	"github.com/golang/mock/gomock"
 	"github.com/ninthclowd/unixodbc/internal/api"
 	"strings"
@@ -123,12 +124,8 @@ func TestStatement_Execute_Cancel(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Millisecond)
 	defer cancel()
 
-	start := time.Now()
-	if gotErr := stmt.Execute(ctx); !strings.Contains(gotErr.Error(), context.DeadlineExceeded.Error()) {
+	if gotErr := stmt.Execute(ctx); !errors.Is(gotErr, context.DeadlineExceeded) {
 		t.Fatalf("expected context cancellation but received: %v", gotErr)
-	}
-	if elapsed := time.Since(start); elapsed.Milliseconds() > 8 {
-		t.Fatalf("cancelled context did not return immediately")
 	}
 }
 
@@ -139,12 +136,9 @@ func TestStatement_ExecDirect(t *testing.T) {
 	sql := "SELECT 1"
 	unicodeSQL := utf16.Encode([]rune(sql))
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Millisecond)
-	defer cancel()
-
 	mockAPI.EXPECT().SQLExecDirect(api.SQLHSTMT(mockHnd.hnd()), unicodeSQL, api.SQLINTEGER(len(sql))).Return(api.SQLRETURN(api.SQL_SUCCESS))
 
-	if gotErr := stmt.ExecDirect(ctx, sql); gotErr != nil {
+	if gotErr := stmt.ExecDirect(context.Background(), sql); gotErr != nil {
 		t.Fatalf("expected no error but got: %v", gotErr)
 	}
 }
@@ -165,13 +159,10 @@ func TestStatement_ExecDirect_Cancel(t *testing.T) {
 
 	mockHnd.EXPECT().cancel().Return(nil).Times(1)
 
-	start := time.Now()
 	if gotErr := stmt.ExecDirect(ctx, sql); !strings.Contains(gotErr.Error(), context.DeadlineExceeded.Error()) {
 		t.Fatalf("expected context cancellation but received: %v", gotErr)
 	}
-	if elapsed := time.Since(start); elapsed.Milliseconds() > 8 {
-		t.Fatalf("cancelled context did not return immediately")
-	}
+
 }
 
 func TestStatement_Prepare(t *testing.T) {
@@ -207,11 +198,8 @@ func TestStatement_Prepare_Cancel(t *testing.T) {
 
 	mockHnd.EXPECT().cancel().Return(nil)
 
-	start := time.Now()
 	if gotErr := stmt.Prepare(ctx, sql); !strings.Contains(gotErr.Error(), context.DeadlineExceeded.Error()) {
 		t.Fatalf("expected context cancellation but received: %v", gotErr)
 	}
-	if elapsed := time.Since(start); elapsed.Milliseconds() > 8 {
-		t.Fatalf("cancelled context did not return immediately")
-	}
+
 }

@@ -9,7 +9,6 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	api "github.com/ninthclowd/unixodbc/internal/api"
 )
 
 // MockColumn is a mock of Column interface.
@@ -122,41 +121,4 @@ func (m *MockColumn) VariableLength() (int64, bool) {
 func (mr *MockColumnMockRecorder) VariableLength() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VariableLength", reflect.TypeOf((*MockColumn)(nil).VariableLength))
-}
-
-// MocksqlNumResultCols is a mock of sqlNumResultCols interface.
-type MocksqlNumResultCols struct {
-	ctrl     *gomock.Controller
-	recorder *MocksqlNumResultColsMockRecorder
-}
-
-// MocksqlNumResultColsMockRecorder is the mock recorder for MocksqlNumResultCols.
-type MocksqlNumResultColsMockRecorder struct {
-	mock *MocksqlNumResultCols
-}
-
-// NewMocksqlNumResultCols creates a new mock instance.
-func NewMocksqlNumResultCols(ctrl *gomock.Controller) *MocksqlNumResultCols {
-	mock := &MocksqlNumResultCols{ctrl: ctrl}
-	mock.recorder = &MocksqlNumResultColsMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MocksqlNumResultCols) EXPECT() *MocksqlNumResultColsMockRecorder {
-	return m.recorder
-}
-
-// SQLNumResultCols mocks base method.
-func (m *MocksqlNumResultCols) SQLNumResultCols(statementHandle api.SQLHSTMT, columnCountPtr *api.SQLSMALLINT) api.SQLRETURN {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SQLNumResultCols", statementHandle, columnCountPtr)
-	ret0, _ := ret[0].(api.SQLRETURN)
-	return ret0
-}
-
-// SQLNumResultCols indicates an expected call of SQLNumResultCols.
-func (mr *MocksqlNumResultColsMockRecorder) SQLNumResultCols(statementHandle, columnCountPtr interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SQLNumResultCols", reflect.TypeOf((*MocksqlNumResultCols)(nil).SQLNumResultCols), statementHandle, columnCountPtr)
 }

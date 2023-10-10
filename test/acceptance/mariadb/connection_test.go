@@ -3,10 +3,10 @@ package acceptance_test
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	_ "github.com/ninthclowd/unixodbc"
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -117,7 +117,7 @@ func TestConnection_Transaction_Rollback(t *testing.T) {
 	}
 }
 
-func TestConnection_ExecContext_Cancel(t *testing.T) {
+func TestValidateSleep(t *testing.T) {
 	_, conn, ctx, finish := newTestConnection(t)
 	defer finish()
 
@@ -127,19 +127,27 @@ func TestConnection_ExecContext_Cancel(t *testing.T) {
 	if elapsed.Seconds() < 1 {
 		t.Error("sleep validation query returned before 1 second")
 	}
+	if err != nil {
+		t.Errorf("expected no error, got: %v", err)
+	}
+}
+
+func TestConnection_ExecContext_Cancel(t *testing.T) {
+	_, conn, ctx, finish := newTestConnection(t)
+	defer finish()
 
 	execCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
 	defer cancel()
 
-	start = time.Now()
-	_, err = conn.ExecContext(execCtx, "SELECT SLEEP(5)")
-	elapsed = time.Since(start)
+	start := time.Now()
+	_, err := conn.ExecContext(execCtx, "SELECT SLEEP(2)")
+	elapsed := time.Since(start)
 	if elapsed.Seconds() > 1 {
-		t.Fatalf("query did not return immediately when cancelled")
+		t.Errorf("query did not return immediately when cancelled")
 	}
 
-	if !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("expected error to be a context error. got: %s", err.Error())
+	if err == nil || !strings.Contains(err.Error(), "[HY018:1317]") {
+		t.Errorf("expected a cancellation error, got: %v", err)
 	}
 
 	_, err = conn.ExecContext(ctx, "SELECT 1")
@@ -152,24 +160,17 @@ func TestConnection_QueryContext_Cancel(t *testing.T) {
 	_, conn, ctx, finish := newTestConnection(t)
 	defer finish()
 
-	start := time.Now()
-	_, err := conn.ExecContext(ctx, "SELECT SLEEP(1)")
-	elapsed := time.Since(start)
-	if elapsed.Seconds() < 1 {
-		t.Error("sleep validation query returned before 1 second")
-	}
-
 	execCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
 	defer cancel()
 
-	start = time.Now()
-	_, err = conn.QueryContext(execCtx, "SELECT SLEEP(2)")
-	elapsed = time.Since(start)
+	start := time.Now()
+	_, err := conn.QueryContext(execCtx, "SELECT SLEEP(2)")
+	elapsed := time.Since(start)
 	if elapsed.Seconds() > 1 {
-		t.Fatalf("query did not return immediately when cancelled")
+		t.Errorf("query did not return immediately when cancelled")
 	}
-	if !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("expected error to be a context error.  got: %s", err.Error())
+	if err == nil || !strings.Contains(err.Error(), "[HY018:1317]") {
+		t.Errorf("expected a cancellation error, got: %v", err)
 	}
 
 	_, err = conn.QueryContext(ctx, "SELECT 1")

@@ -19,13 +19,6 @@ SQLRETURN allocHandleNullInput(
 	return SQLAllocHandle(HandleType,SQL_NULL_HANDLE,OutputHandlePtr);
 }
 
-//SQLRETURN setEnvAttrConst(
-//     SQLHENV      EnvironmentHandle,
-//     SQLINTEGER   Attribute,
-//     ulong ConstValue){
-//	return SQLSetEnvAttr(EnvironmentHandle, Attribute, (SQLPOINTER)ConstValue, 0);
-//}
-
 SQLPOINTER constValue(ulong ConstValue){
 	return (SQLPOINTER)ConstValue;
 }
@@ -128,6 +121,14 @@ func (a *API) SQLSetConnectAttrConst(connHandle SQLHDBC, attribute SQLINTEGER, v
 	return SQLRETURN(C.SQLSetConnectAttr(C.SQLHDBC(connHandle), C.SQLINTEGER(attribute), C.constValue(C.ulong(value)), SQL_IS_UINTEGER))
 }
 
+func (a *API) SQLSetStmtAttrConst(stmtHandle SQLHSTMT, attribute SQLINTEGER, value uint64) SQLRETURN {
+	return SQLRETURN(C.SQLSetStmtAttr(C.SQLHSTMT(stmtHandle), C.SQLINTEGER(attribute), C.constValue(C.ulong(value)), 0))
+}
+
+func (a *API) SQLSetStmtAttrPointer(stmtHandle SQLHSTMT, attribute SQLINTEGER, pointer SQLPOINTER) SQLRETURN {
+	return SQLRETURN(C.SQLSetStmtAttr(C.SQLHSTMT(stmtHandle), C.SQLINTEGER(attribute), C.SQLPOINTER(pointer), SQL_IS_POINTER))
+}
+
 func (a *API) SQLDriverConnectW(connectionHandle SQLHDBC, windowHandle SQLHWND, inConnectionString []uint16, stringLength1 SQLSMALLINT, outConnectionString *[]uint16, bufferLength SQLSMALLINT, stringLength2Ptr *SQLSMALLINT, driverCompletion SQLUSMALLINT) SQLRETURN {
 	var outStrPtr *uint16 = nil
 	if outConnectionString != nil {
@@ -156,6 +157,21 @@ func (a *API) SQLNumResultCols(statementHandle SQLHSTMT, columnCountPtr *SQLSMAL
 	return SQLRETURN(C.SQLNumResultCols(
 		C.SQLHSTMT(statementHandle),
 		(*C.SQLSMALLINT)(unsafe.Pointer(columnCountPtr)),
+	))
+}
+
+func (a *API) SQLGetInfo(
+	connectionHandle SQLHDBC,
+	infoType SQLUSMALLINT,
+	infoValuePtr SQLPOINTER,
+	bufferLength SQLSMALLINT,
+	stringLengthPtr *SQLSMALLINT) SQLRETURN {
+	return SQLRETURN(C.SQLGetInfo(
+		C.SQLHDBC(connectionHandle),
+		C.SQLUSMALLINT(infoType),
+		C.SQLPOINTER(infoValuePtr),
+		C.SQLSMALLINT(bufferLength),
+		(*C.SQLSMALLINT)(stringLengthPtr),
 	))
 }
 

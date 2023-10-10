@@ -42,68 +42,37 @@ func (s *Statement) Close() error {
 }
 
 func (s *Statement) ExecDirect(ctx context.Context, sql string) error {
-	result := make(chan error, 1)
-	go func() {
-		statementBytes := utf16.Encode([]rune(sql))
-		_, err := s.result(s.api().SQLExecDirect(api.SQLHSTMT(s.hnd()), statementBytes, api.SQLINTEGER(len(statementBytes))))
-		if ctx.Err() == nil {
-			result <- err
-		}
-		close(result)
-	}()
+	done := cancelHandleOnContext(ctx, s)
 
-	select {
-	case err := <-result:
-		return err
-	case <-ctx.Done():
-		errs := make(ErrorMap)
-		errs["cancelling statement"] = s.cancel()
-		errs["context"] = ctx.Err()
-		return errs.Err()
+	statementBytes := utf16.Encode([]rune(sql))
+	_, err := s.result(s.api().SQLExecDirect(api.SQLHSTMT(s.hnd()), statementBytes, api.SQLINTEGER(len(statementBytes))))
+	done()
+	if err == nil {
+		err = ctx.Err()
 	}
+	return err
 }
 
 func (s *Statement) Execute(ctx context.Context) error {
-	result := make(chan error, 1)
-	go func() {
-		_, err := s.result(s.api().SQLExecute(api.SQLHSTMT(s.hnd())))
-		if ctx.Err() == nil {
-			result <- err
-		}
-		close(result)
-	}()
-
-	select {
-	case err := <-result:
-		return err
-	case <-ctx.Done():
-		errs := make(ErrorMap)
-		errs["cancelling statement"] = s.cancel()
-		errs["context"] = ctx.Err()
-		return errs.Err()
+	done := cancelHandleOnContext(ctx, s)
+	_, err := s.result(s.api().SQLExecute(api.SQLHSTMT(s.hnd())))
+	done()
+	if err == nil {
+		err = ctx.Err()
 	}
+	return err
 }
 
 func (s *Statement) Prepare(ctx context.Context, sql string) error {
-	result := make(chan error, 1)
-	go func() {
-		statementBytes := utf16.Encode([]rune(sql))
-		_, err := s.result(s.api().SQLPrepare(api.SQLHSTMT(s.hnd()), statementBytes, api.SQLINTEGER(len(statementBytes))))
-		if ctx.Err() == nil {
-			result <- err
-		}
-		close(result)
-	}()
+	done := cancelHandleOnContext(ctx, s)
 
-	select {
-	case err := <-result:
-		return err
-	case <-ctx.Done():
-		errs := make(ErrorMap)
-		errs["cancelling statement"] = s.cancel()
-		errs["context"] = ctx.Err()
-		return errs.Err()
+	statementBytes := utf16.Encode([]rune(sql))
+	_, err := s.result(s.api().SQLPrepare(api.SQLHSTMT(s.hnd()), statementBytes, api.SQLINTEGER(len(statementBytes))))
+	done()
+	if err == nil {
+		err = ctx.Err()
 	}
+	return err
 }
 
 func (s *Statement) RecordSet() (*RecordSet, error) {

@@ -78,41 +78,32 @@ func (e *Environment) Connect(ctx context.Context, connStr string) (*Connection,
 	if err != nil {
 		return nil, fmt.Errorf("unable to alloc new connection: %w", err)
 	}
-	//
-	//if err := connection.registerNotifications(); err != nil {
-	//	_ = connection.Close(ctx)API: e.API()
-	//	return nil, err
-	//}
+
+	done := cancelHandleOnContext(ctx, hnd)
 
 	connStrBytes := utf16.Encode([]rune(connStr))
 
-	result := make(chan error, 1)
-	go func() {
-		_, err = hnd.result(hnd.api().SQLDriverConnectW(
-			(api.SQLHDBC)(hnd.hnd()),
-			nil,
-			connStrBytes,
-			api.SQLSMALLINT(len(connStrBytes)),
-			nil,
-			0,
-			nil,
-			api.SQL_DRIVER_NOPROMPT))
-		if ctx.Err() == nil {
-			result <- err
-		}
-		close(result)
-	}()
+	_, err = hnd.result(hnd.api().SQLDriverConnectW(
+		(api.SQLHDBC)(hnd.hnd()),
+		nil,
+		connStrBytes,
+		api.SQLSMALLINT(len(connStrBytes)),
+		nil,
+		0,
+		nil,
+		api.SQL_DRIVER_NOPROMPT))
 
-	select {
-	case err = <-result:
-		return &Connection{handle: hnd, env: e}, err
-	case <-ctx.Done():
-		errs := make(ErrorMap)
-		errs["cancel"] = hnd.cancel()
-		errs["free"] = hnd.free()
-		errs["context"] = ctx.Err()
-		return nil, errs.Err()
+	done()
+
+	if err == nil {
+		err = ctx.Err()
 	}
+	if err != nil {
+		_ = hnd.free()
+		return nil, err
+	}
+
+	return &Connection{handle: hnd, env: e}, nil
 
 }
 

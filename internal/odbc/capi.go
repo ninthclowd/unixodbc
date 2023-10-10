@@ -1,5 +1,6 @@
 package odbc
 
+import "C"
 import "github.com/ninthclowd/unixodbc/internal/api"
 
 //go:generate mockgen -source=capi.go -package odbc -destination capi_mock_test.go -mock_names odbcAPI=MockAPI
@@ -9,6 +10,8 @@ type odbcAPI interface {
 	SQLBindParameter(statementHandle api.SQLHSTMT, parameterNumber api.SQLUSMALLINT, inputOutputType api.SQLSMALLINT, valueType api.SQLSMALLINT, parameterType api.SQLSMALLINT, columnSize api.SQLULEN, decimalDigits api.SQLSMALLINT, parameterValuePtr api.SQLPOINTER, bufferLength api.SQLLEN, strLenOrIndPtr *api.SQLLEN) api.SQLRETURN
 	SQLDescribeCol(statementHandle api.SQLHSTMT, columnNumber api.SQLUSMALLINT, columnName *[]uint16, bufferLength api.SQLSMALLINT, nameLengthPtr *api.SQLSMALLINT, dataTypePtr *api.SQLSMALLINT, columnSizePtr *api.SQLULEN, decimalDigitsPtr *api.SQLSMALLINT, nullablePtr *api.SQLSMALLINT) api.SQLRETURN
 	SQLSetEnvAttrConst(environmentHandle api.SQLHENV, attribute api.SQLINTEGER, value uint64) api.SQLRETURN
+	SQLSetStmtAttrConst(stmtHandle api.SQLHSTMT, attribute api.SQLINTEGER, value uint64) api.SQLRETURN
+	SQLSetStmtAttrPointer(stmtHandle api.SQLHSTMT, attribute api.SQLINTEGER, pointer api.SQLPOINTER) api.SQLRETURN
 	SQLSetConnectAttrConst(connectionHandle api.SQLHDBC, attribute api.SQLINTEGER, value uint64) api.SQLRETURN
 	SQLDriverConnectW(connectionHandle api.SQLHDBC, windowHandle api.SQLHWND, inConnectionString []uint16, stringLength1 api.SQLSMALLINT, outConnectionString *[]uint16, bufferLength api.SQLSMALLINT, stringLength2Ptr *api.SQLSMALLINT, driverCompletion api.SQLUSMALLINT) api.SQLRETURN
 	SQLPrepare(statementHandle api.SQLHSTMT, statementText []uint16, textLength api.SQLINTEGER) api.SQLRETURN
@@ -27,4 +30,5 @@ type odbcAPI interface {
 	SQLCloseCursor(statementHandle api.SQLHSTMT) api.SQLRETURN
 	SQLSetEnvAttrStr(environmentHandle api.SQLHENV, attribute api.SQLINTEGER, value api.SQLPOINTER, stringLength api.SQLINTEGER) api.SQLRETURN
 	SQLEndTran(handleType api.SQLSMALLINT, handle api.SQLHANDLE, completionType api.SQLSMALLINT) api.SQLRETURN
+	SQLGetInfo(connectionHandle api.SQLHDBC, infoType api.SQLUSMALLINT, infoValuePtr api.SQLPOINTER, bufferLength api.SQLSMALLINT, stringLengthPtr *api.SQLSMALLINT) api.SQLRETURN
 }

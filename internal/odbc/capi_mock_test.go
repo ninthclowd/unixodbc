@@ -258,6 +258,20 @@ func (mr *MockAPIMockRecorder) SQLGetDiagRecW(handleType, handle, recNumber, sql
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SQLGetDiagRecW", reflect.TypeOf((*MockAPI)(nil).SQLGetDiagRecW), handleType, handle, recNumber, sqlState, nativeErrorPtr, messageText, bufferLength, textLengthPtr)
 }
 
+// SQLGetInfo mocks base method.
+func (m *MockAPI) SQLGetInfo(connectionHandle api.SQLHDBC, infoType api.SQLUSMALLINT, infoValuePtr api.SQLPOINTER, bufferLength api.SQLSMALLINT, stringLengthPtr *api.SQLSMALLINT) api.SQLRETURN {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SQLGetInfo", connectionHandle, infoType, infoValuePtr, bufferLength, stringLengthPtr)
+	ret0, _ := ret[0].(api.SQLRETURN)
+	return ret0
+}
+
+// SQLGetInfo indicates an expected call of SQLGetInfo.
+func (mr *MockAPIMockRecorder) SQLGetInfo(connectionHandle, infoType, infoValuePtr, bufferLength, stringLengthPtr interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SQLGetInfo", reflect.TypeOf((*MockAPI)(nil).SQLGetInfo), connectionHandle, infoType, infoValuePtr, bufferLength, stringLengthPtr)
+}
+
 // SQLGetTypeInfo mocks base method.
 func (m *MockAPI) SQLGetTypeInfo(statementHandle api.SQLHSTMT, dataType api.SQLSMALLINT) api.SQLRETURN {
 	m.ctrl.T.Helper()
@@ -354,4 +368,32 @@ func (m *MockAPI) SQLSetEnvAttrStr(environmentHandle api.SQLHENV, attribute api.
 func (mr *MockAPIMockRecorder) SQLSetEnvAttrStr(environmentHandle, attribute, value, stringLength interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SQLSetEnvAttrStr", reflect.TypeOf((*MockAPI)(nil).SQLSetEnvAttrStr), environmentHandle, attribute, value, stringLength)
+}
+
+// SQLSetStmtAttrConst mocks base method.
+func (m *MockAPI) SQLSetStmtAttrConst(stmtHandle api.SQLHSTMT, attribute api.SQLINTEGER, value uint64) api.SQLRETURN {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SQLSetStmtAttrConst", stmtHandle, attribute, value)
+	ret0, _ := ret[0].(api.SQLRETURN)
+	return ret0
+}
+
+// SQLSetStmtAttrConst indicates an expected call of SQLSetStmtAttrConst.
+func (mr *MockAPIMockRecorder) SQLSetStmtAttrConst(stmtHandle, attribute, value interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SQLSetStmtAttrConst", reflect.TypeOf((*MockAPI)(nil).SQLSetStmtAttrConst), stmtHandle, attribute, value)
+}
+
+// SQLSetStmtAttrPointer mocks base method.
+func (m *MockAPI) SQLSetStmtAttrPointer(stmtHandle api.SQLHSTMT, attribute api.SQLINTEGER, pointer api.SQLPOINTER) api.SQLRETURN {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SQLSetStmtAttrPointer", stmtHandle, attribute, pointer)
+	ret0, _ := ret[0].(api.SQLRETURN)
+	return ret0
+}
+
+// SQLSetStmtAttrPointer indicates an expected call of SQLSetStmtAttrPointer.
+func (mr *MockAPIMockRecorder) SQLSetStmtAttrPointer(stmtHandle, attribute, pointer interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SQLSetStmtAttrPointer", reflect.TypeOf((*MockAPI)(nil).SQLSetStmtAttrPointer), stmtHandle, attribute, pointer)
 }
