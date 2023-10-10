@@ -1,25 +1,8 @@
 FROM golang:1.21-bookworm as base
 RUN apt update
-RUN apt-get install -y libssl-dev unixodbc-dev unixodbc odbcinst
-
-# install mariadb api connector
-WORKDIR /usr/src/odbc
-
-ADD https://dlm.mariadb.com/3286236/Connectors/odbc/connector-odbc-3.1.19/mariadb-connector-odbc-3.1.19-ubuntu-lunar-amd64.tar.gz connector.tar
-RUN tar -xvf connector.tar
-
-RUN mv mariadb-connector* connector
-WORKDIR /usr/src/odbc/connector
-RUN install lib/mariadb/libmaodbc.so /usr/local/lib/
-RUN install lib/mariadb/libmariadb.so.3 /usr/local/lib/
-RUN install -d /usr/local/lib/mariadb/
-RUN install -d /usr/local/lib/mariadb/plugin/
-RUN install lib/mariadb/plugin/* /usr/local/lib/mariadb/plugin/
-RUN ldconfig
+RUN apt-get install -y libssl-dev unixodbc-dev unixodbc odbcinst odbc-mariadb
 
 WORKDIR /usr/src/odbc
-COPY test/acceptance/mariadb/odbcinst.ini .
-RUN odbcinst -i -d -f odbcinst.ini
 COPY test/acceptance/mariadb/odbc.ini .
 RUN odbcinst -i -s -l -f odbc.ini
 
