@@ -38,3 +38,11 @@ jobs:
         uses: actions/checkout@v4
       - name: Run acceptance tests
         run: docker compose run --rm postgres_test
+  mssql_test:
+    name: MSSQL Acceptance Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Run acceptance tests
+        run: docker compose run --rm mssql_test

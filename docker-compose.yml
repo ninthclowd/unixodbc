@@ -1,9 +1,7 @@
 version: "3.8"
 services:
   mariadb_test:
-    build:
-      context: .
-      dockerfile: test/acceptance/mariadb/Dockerfile
+    build: test/acceptance/mariadb/container
     volumes:
       - .:/usr/src/unixodbc
     environment:
@@ -27,10 +25,8 @@ services:
       timeout: 5s
       retries: 55
 
-  pg_test:
-    build:
-      context: .
-      dockerfile: test/acceptance/postgres/Dockerfile
+  postgres_test:
+    build: test/acceptance/postgres/container
     volumes:
       - .:/usr/src/unixodbc
     environment:
@@ -50,6 +46,34 @@ services:
     healthcheck:
       test: pg_isready
       start_period: 5s
+      interval: 5s
+      timeout: 5s
+      retries: 55
+
+  mssql_test:
+    build: test/acceptance/mssql/container
+    volumes:
+      - .:/usr/src/unixodbc
+    environment:
+      DB_HOST: mssql
+    depends_on:
+      mssql:
+        condition: service_healthy
+    command: go test -race -coverpkg=./... -coverprofile=./test/acceptance/mssql/coverage.out -tags acceptance ./test/acceptance/mssql
+
+
+  mssql:
+    image: "mcr.microsoft.com/mssql/server:2022-latest"
+    ports:
+      - "1433"
+    environment:
+      ACCEPT_EULA: Y
+      MSSQL_SA_PASSWORD: Acceptance!
+      MSSQL_PID: Developer
+      MSSQL_TCP_PORT: 1433
+    healthcheck:
+      test: /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P "$${MSSQL_SA_PASSWORD}" -Q "SELECT @@version" || exit 1
+      start_period: 10s
       interval: 5s
       timeout: 5s
       retries: 55
