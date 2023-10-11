@@ -65,12 +65,6 @@ func TestParameterBinding(t *testing.T) {
 			sql:         `SELECT 1 WHERE ? IS NULL`,
 			arg:         nil,
 		},
-
-		{
-			description: "it should bind a nil value",
-			sql:         `SELECT 1 WHERE ? IS NULL`,
-			arg:         nil,
-		},
 		{
 			description: "it should bind a binary value",
 			sql:         `SELECT 1 WHERE ? = CAST('FOO' AS BINARY)`,
