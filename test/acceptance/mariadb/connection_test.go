@@ -16,7 +16,7 @@ func newTestConnection(t *testing.T) (db *sql.DB, conn *sql.Conn, ctx context.Co
 	if host == "" {
 		t.Skip("DB_HOST not set")
 	}
-	db, err := sql.Open("unixodbc", fmt.Sprintf("DSN=MariaDB;SERVER=%s", host))
+	db, err := sql.Open("unixodbc", fmt.Sprintf("Driver=MariaDB Unicode;Server=%s;UID=root;PWD=test", host))
 	if err != nil {
 		t.Fatalf("unable to open database: %s", err.Error())
 	}
