@@ -8,7 +8,10 @@ import (
 )
 
 func init() {
-	registerColumnFactoryForType(newTimeColumn, api.SQL_TYPE_TIME)
+	registerColumnFactoryForType(newTimeColumn,
+		api.SQL_TYPE_TIME,
+		-154, //mssql time type
+	)
 }
 
 func newTimeColumn(info *columnInfo, hnd handle) Column {
