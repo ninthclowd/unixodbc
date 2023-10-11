@@ -6,6 +6,10 @@ import (
 	"reflect"
 )
 
+const (
+	defaultBinarySize = 10240
+)
+
 func init() {
 	registerColumnFactoryForType(newBinaryColumn,
 		api.SQL_BINARY,
@@ -36,7 +40,11 @@ func (c *columnBinary) Decimal() (precision int64, scale int64, ok bool) {
 }
 
 func (c *columnBinary) Value() (driver.Value, error) {
-	value := make([]byte, c.columnSize)
+	size := c.columnSize
+	if size == 0 {
+		size = defaultBinarySize
+	}
+	value := make([]byte, size)
 	var valueLength api.SQLLEN
 	if _, err := c.result(c.api().SQLGetData(api.SQLHSTMT(c.hnd()), c.columnNumber, api.SQL_C_BINARY, api.SQLPOINTER(&value[0]), api.SQLLEN(len(value)), &valueLength)); err != nil {
 		return nil, err
