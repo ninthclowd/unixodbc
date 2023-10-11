@@ -63,6 +63,10 @@ func (c *Connection) Statement() (*Statement, error) {
 		conn:   c,
 	}
 
+	if err := stmt.SetConcurrency(ConcurrencyLock); err != nil {
+		return nil, fmt.Errorf("setting concurrency lock: %w", err)
+	}
+
 	return stmt, nil
 }
 

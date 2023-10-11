@@ -15,10 +15,33 @@ var (
 	ErrRecordSetOpen = errors.New("recordset is still open")
 )
 
+type CursorSensitivity uint64
+
+const (
+	CursorSensitive   = CursorSensitivity(api.SQL_SENSITIVE)
+	CursorInsensitive = CursorSensitivity(api.SQL_INSENSITIVE)
+)
+
+type Concurrency uint64
+
+const (
+	ConcurrencyLock = Concurrency(api.SQL_CONCUR_LOCK)
+)
+
 type Statement struct {
 	handle
 	conn *Connection
 	rs   *RecordSet
+}
+
+func (s *Statement) SetCursorSensitivity(sensitivity CursorSensitivity) error {
+	_, err := s.result(s.api().SQLSetStmtAttrConst(api.SQLHSTMT(s.hnd()), api.SQL_ATTR_CURSOR_SENSITIVITY, uint64(sensitivity)))
+	return err
+}
+
+func (s *Statement) SetConcurrency(concurrency Concurrency) error {
+	_, err := s.result(s.api().SQLSetStmtAttrConst(api.SQLHSTMT(s.hnd()), api.SQL_ATTR_CONCURRENCY, uint64(concurrency)))
+	return err
 }
 
 func (s *Statement) NumParams() (int, error) {
