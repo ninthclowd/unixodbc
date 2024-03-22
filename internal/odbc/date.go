@@ -35,7 +35,7 @@ func (c *columnDate) Decimal() (precision int64, scale int64, ok bool) {
 func (c *columnDate) Value() (driver.Value, error) {
 	var value api.SQL_DATE_STRUCT
 	var valueLength api.SQLLEN
-	if _, err := c.result(c.api().SQLGetData(api.SQLHSTMT(c.hnd()), c.columnNumber, api.SQL_C_DATE, api.SQLPOINTER(&value), 0, nil)); err != nil {
+	if _, err := c.result(c.api().SQLGetData(api.SQLHSTMT(c.hnd()), c.columnNumber, api.SQL_C_DATE, api.SQLPOINTER(&value), 0, &valueLength)); err != nil {
 		return nil, err
 	}
 	if valueLength == api.SQL_NULL_DATA {

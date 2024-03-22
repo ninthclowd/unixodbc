@@ -35,7 +35,7 @@ func (c *columnTimestamp) Decimal() (precision int64, scale int64, ok bool) {
 func (c *columnTimestamp) Value() (driver.Value, error) {
 	var value api.SQL_TIMESTAMP_STRUCT
 	var valueLength api.SQLLEN
-	if _, err := c.result(c.api().SQLGetData(api.SQLHSTMT(c.hnd()), c.columnNumber, api.SQL_C_TIMESTAMP, api.SQLPOINTER(&value), 0, nil)); err != nil {
+	if _, err := c.result(c.api().SQLGetData(api.SQLHSTMT(c.hnd()), c.columnNumber, api.SQL_C_TIMESTAMP, api.SQLPOINTER(&value), 0, &valueLength)); err != nil {
 		return nil, err
 	}
 	if valueLength == api.SQL_NULL_DATA {
