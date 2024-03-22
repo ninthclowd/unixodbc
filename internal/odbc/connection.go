@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/ninthclowd/unixodbc/internal/api"
-	"github.com/ninthclowd/unixodbc/internal/cache"
 )
 
 var (
@@ -31,8 +30,7 @@ const (
 
 type Connection struct {
 	handle
-	env             *Environment
-	cachedDataTypes cache.Value[map[api.SQLINTEGER]*TypeInfo]
+	env *Environment
 }
 
 func (c *Connection) Ping() error {
@@ -70,54 +68,6 @@ func (c *Connection) Statement() (*Statement, error) {
 	}
 
 	return stmt, nil
-}
-
-func (c *Connection) TypeInfo(dataType api.SQLINTEGER) (*TypeInfo, error) {
-	dataTypes, err := c.cachedDataTypes.Get(func() (map[api.SQLINTEGER]*TypeInfo, error) {
-		st, err := c.Statement()
-		if err != nil {
-			return nil, err
-		}
-		defer st.Close()
-		return st.serverDataTypes()
-	}, nil)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if dType, found := dataTypes[dataType]; found {
-		return dType, nil
-	} else {
-		return nil, fmt.Errorf("server info for SQL data type %d not found", dataType)
-	}
-}
-
-func (c *Connection) stringDataType(length int) (dataType api.SQLINTEGER, size api.SQLULEN, err error) {
-	wCharType, err := c.TypeInfo(api.SQL_WCHAR)
-	sLength := api.SQLULEN(length)
-	if err != nil {
-		return
-	}
-	if sLength < wCharType.ColumnSize {
-		return api.SQL_WCHAR, wCharType.ColumnSize, nil
-	}
-	wVarcharType, err := c.TypeInfo(api.SQL_WVARCHAR)
-	if err != nil {
-		return
-	}
-	if sLength < wVarcharType.ColumnSize {
-		return api.SQL_WVARCHAR, wVarcharType.ColumnSize, nil
-	}
-
-	wLongVarcharType, err := c.TypeInfo(api.SQL_WLONGVARCHAR)
-	if err != nil {
-		return
-	}
-	if sLength < wLongVarcharType.ColumnSize {
-		return api.SQL_WLONGVARCHAR, wLongVarcharType.ColumnSize, nil
-	}
-	return 0, 0, fmt.Errorf("no datatype that will fit string of length %d", length)
 }
 
 func (c *Connection) SetAutoCommit(autoCommit bool) error {

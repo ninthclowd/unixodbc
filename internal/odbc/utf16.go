@@ -6,6 +6,7 @@ import (
 	"github.com/ninthclowd/unixodbc/internal/api"
 	"reflect"
 	"unicode/utf16"
+	"unsafe"
 )
 
 func init() {
@@ -53,22 +54,18 @@ func (c *columnUTF16) Value() (driver.Value, error) {
 }
 
 func (s *Statement) bindUTF16(index int, src string) error {
-	size := len(src)
 	nts := make([]rune, len(src)+1)
 	for i, r := range src {
 		nts[i] = r
 	}
 	val := utf16.Encode(nts)
-	dType, dSize, err := s.conn.stringDataType(size)
-	if err != nil {
-		return err
-	}
-	execSize := api.SQLLEN(size * 2)
-	_, err = s.result(s.api().SQLBindParameter((api.SQLHSTMT)(s.hnd()), api.SQLUSMALLINT(index+1), api.SQL_PARAM_INPUT,
-		api.SQL_C_WCHAR, api.SQLSMALLINT(dType),
-		dSize, 0,
+
+	sz := unsafe.Sizeof(val)
+	_, err := s.result(s.api().SQLBindParameter((api.SQLHSTMT)(s.hnd()), api.SQLUSMALLINT(index+1), api.SQL_PARAM_INPUT,
+		api.SQL_C_WCHAR, api.SQLSMALLINT(api.SQL_WVARCHAR),
+		api.SQLULEN(sz), 0,
 		api.SQLPOINTER(&val[0]),
-		0, &execSize))
+		0, nil))
 	return err
 }
 

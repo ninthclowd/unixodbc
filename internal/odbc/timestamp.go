@@ -5,6 +5,7 @@ import (
 	"github.com/ninthclowd/unixodbc/internal/api"
 	"reflect"
 	"time"
+	"unsafe"
 )
 
 func init() {
@@ -45,10 +46,6 @@ func (c *columnTimestamp) Value() (driver.Value, error) {
 }
 
 func (s *Statement) bindTimestamp(index int, value *time.Time) error {
-	typeInfo, err := s.conn.TypeInfo(api.SQL_TYPE_TIMESTAMP)
-	if err != nil {
-		return err
-	}
 	ts := api.SQL_TIMESTAMP_STRUCT{
 		Year:     api.SQLSMALLINT(value.Year()),
 		Month:    api.SQLUSMALLINT(value.Month()),
@@ -59,9 +56,10 @@ func (s *Statement) bindTimestamp(index int, value *time.Time) error {
 		Fraction: api.SQLUINTEGER(value.Nanosecond()),
 	}
 
-	_, err = s.result(s.api().SQLBindParameter((api.SQLHSTMT)(s.hnd()), api.SQLUSMALLINT(index+1), api.SQL_PARAM_INPUT,
+	sz := unsafe.Sizeof(ts)
+	_, err := s.result(s.api().SQLBindParameter((api.SQLHSTMT)(s.hnd()), api.SQLUSMALLINT(index+1), api.SQL_PARAM_INPUT,
 		api.SQL_C_TIMESTAMP, api.SQL_TYPE_TIMESTAMP,
-		typeInfo.ColumnSize, 0, //TODO: validate this is correct for all server types
+		api.SQLULEN(sz), 0,
 		api.SQLPOINTER(&ts),
 		0, nil))
 	return err

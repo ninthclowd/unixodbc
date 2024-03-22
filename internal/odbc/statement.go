@@ -177,27 +177,6 @@ func (s *Statement) bindNil(index int) error {
 	return err
 }
 
-func (s *Statement) serverDataTypes() (map[api.SQLINTEGER]*TypeInfo, error) {
-	typeInfo := make(map[api.SQLINTEGER]*TypeInfo)
-	if _, err := s.result(s.api().SQLGetTypeInfo(api.SQLHSTMT(s.hnd()), api.SQL_ALL_TYPES)); err != nil {
-		return nil, fmt.Errorf("getting SQLGetTypeInfo: %w", err)
-	}
-	rs, err := s.RecordSet()
-	if err != nil {
-		return nil, fmt.Errorf("getting SQLGetTypeInfo results: %w", err)
-	}
-	defer rs.Close()
-
-	for more, _ := rs.Fetch(); more; more, _ = rs.Fetch() {
-		info := new(TypeInfo)
-		if err = rs.Unmarshal(info); err != nil {
-			return nil, err
-		}
-		typeInfo[info.DataType] = info
-	}
-	return typeInfo, nil
-}
-
 type columnsDetails struct {
 	names   []string
 	byName  map[string]Column
