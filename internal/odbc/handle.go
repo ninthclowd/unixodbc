@@ -8,6 +8,7 @@ import (
 	"github.com/ninthclowd/unixodbc/internal/api"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"unicode/utf16"
 )
 
@@ -19,6 +20,12 @@ var (
 	ErrInvalidHandle = errors.New("invalid handle")
 	ErrHandleFreed   = errors.New("attempt to double free")
 )
+
+var openHandleCount atomic.Int64
+
+func OpenHandles() int64 {
+	return openHandleCount.Load()
+}
 
 func cancelHandleOnContext(ctx context.Context, h handle) (done func()) {
 	var wg sync.WaitGroup
@@ -75,6 +82,7 @@ func newEnvHandle(cAPI odbcAPI) (handle, error) {
 	if r := cAPI.SQLAllocHandle(api.SQL_HANDLE_ENV, nil, &hnd.ptr); r == api.SQL_ERROR {
 		return nil, fmt.Errorf("unable to alloc env handle: %d", (int)(r))
 	}
+	openHandleCount.Add(1)
 	return hnd, nil
 }
 
@@ -108,6 +116,7 @@ func (h *handleImpl) free() error {
 	if code := h.cAPI.SQLFreeHandle(h.ptrType, h.ptr); code != api.SQL_SUCCESS {
 		return fmt.Errorf("received code %d when freeing handle", code)
 	}
+	openHandleCount.Add(-1)
 	h.ptr = nil
 	return nil
 }
@@ -117,6 +126,8 @@ func (h *handleImpl) child(handleType api.SQLSMALLINT) (handle, error) {
 	if _, err := h.result(h.cAPI.SQLAllocHandle(handleType, h.hnd(), &hnd.ptr)); err != nil {
 		return nil, err
 	}
+	openHandleCount.Add(1)
+
 	return hnd, nil
 }
 

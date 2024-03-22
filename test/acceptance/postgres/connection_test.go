@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	_ "github.com/ninthclowd/unixodbc"
+	"github.com/ninthclowd/unixodbc"
 	"os"
 	"strings"
 	"testing"
@@ -32,6 +32,9 @@ func newTestConnection(t *testing.T) (db *sql.DB, conn *sql.Conn, ctx context.Co
 		cancel()
 		conn.Close()
 		db.Close()
+		if count := unixodbc.OpenHandles(); count > 0 {
+			t.Fatalf("%d open ODBC handles", count)
+		}
 	}
 
 	return

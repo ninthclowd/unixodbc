@@ -3,12 +3,17 @@ package unixodbc
 import (
 	"database/sql"
 	"database/sql/driver"
+	"github.com/ninthclowd/unixodbc/internal/odbc"
 )
 
 var driverInstance = &Driver{}
 
 func init() {
 	sql.Register("unixodbc", driverInstance)
+}
+
+func OpenHandles() int64 {
+	return odbc.OpenHandles()
 }
 
 var _ driver.DriverContext = (*Driver)(nil)

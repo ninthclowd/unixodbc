@@ -18,8 +18,9 @@ var _ driver.RowsColumnTypeScanType = (*Rows)(nil)
 var _ driver.RowsColumnTypePrecisionScale = (*Rows)(nil)
 
 type Rows struct {
-	ctx           context.Context
-	odbcRecordset *odbc.RecordSet
+	ctx                context.Context
+	odbcRecordset      *odbc.RecordSet
+	closeStmtOnRSClose *odbc.Statement
 }
 
 // ColumnTypePrecisionScale implements driver.RowsColumnTypePrecisionScale
@@ -61,6 +62,9 @@ func (r *Rows) Close() error {
 		errs["closing recordset"] = r.odbcRecordset.Close()
 	})
 	r.odbcRecordset = nil
+	if r.closeStmtOnRSClose != nil {
+		errs["closing statement"] = r.closeStmtOnRSClose.Close()
+	}
 	return errs.Error()
 }
 

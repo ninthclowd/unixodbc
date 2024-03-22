@@ -257,7 +257,8 @@ func (c *Connection) QueryContext(ctx context.Context, query string, args []driv
 		_ = st.Close()
 		return nil, err
 	}
-	return &Rows{odbcRecordset: rs, ctx: ctx}, nil
+
+	return &Rows{odbcRecordset: rs, closeStmtOnRSClose: st, ctx: ctx}, nil
 }
 
 // Ping implements driver.Pinger

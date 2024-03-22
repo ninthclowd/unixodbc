@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/ninthclowd/unixodbc/internal/api"
+
 	"math"
 	"reflect"
 	"time"
@@ -179,11 +180,11 @@ func (s *Statement) bindNil(index int) error {
 func (s *Statement) serverDataTypes() (map[api.SQLINTEGER]*TypeInfo, error) {
 	typeInfo := make(map[api.SQLINTEGER]*TypeInfo)
 	if _, err := s.result(s.api().SQLGetTypeInfo(api.SQLHSTMT(s.hnd()), api.SQL_ALL_TYPES)); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("getting SQLGetTypeInfo: %w", err)
 	}
 	rs, err := s.RecordSet()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("getting SQLGetTypeInfo results: %w", err)
 	}
 	defer rs.Close()
 
