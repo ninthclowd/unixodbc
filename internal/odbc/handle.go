@@ -16,7 +16,7 @@ func init() {
 }
 
 var (
-	ErrInvalidHandle = errors.New("invalid handleImpl")
+	ErrInvalidHandle = errors.New("invalid handle")
 	ErrHandleFreed   = errors.New("attempt to double free")
 )
 
