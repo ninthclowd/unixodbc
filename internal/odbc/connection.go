@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/ninthclowd/unixodbc/internal/api"
+	"github.com/ninthclowd/unixodbc/internal/cache"
 )
 
 var (
@@ -30,7 +31,8 @@ const (
 
 type Connection struct {
 	handle
-	env *Environment
+	env             *Environment
+	cachedDataTypes cache.Value[map[api.SQLINTEGER]*TypeInfo]
 }
 
 func (c *Connection) Ping() error {
@@ -71,7 +73,7 @@ func (c *Connection) Statement() (*Statement, error) {
 }
 
 func (c *Connection) TypeInfo(dataType api.SQLINTEGER) (*TypeInfo, error) {
-	dataTypes, err := c.env.cachedDataTypes.Get(func() (map[api.SQLINTEGER]*TypeInfo, error) {
+	dataTypes, err := c.cachedDataTypes.Get(func() (map[api.SQLINTEGER]*TypeInfo, error) {
 		st, err := c.Statement()
 		if err != nil {
 			return nil, err

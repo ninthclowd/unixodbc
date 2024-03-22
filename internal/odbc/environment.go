@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/ninthclowd/unixodbc/internal/api"
-	"github.com/ninthclowd/unixodbc/internal/cache"
 	"unicode/utf16"
 )
 
@@ -43,7 +42,6 @@ func NewEnvironment(config *Config) (*Environment, error) {
 
 type Environment struct {
 	handle
-	cachedDataTypes cache.Value[map[api.SQLINTEGER]*TypeInfo]
 }
 
 func (e *Environment) SetVersion(version Version) error {
