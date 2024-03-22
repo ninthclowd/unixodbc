@@ -9,7 +9,7 @@ services:
     depends_on:
       mariadb:
         condition: service_healthy
-    command: go test -race -coverpkg=./... -coverprofile=./test/acceptance/mariadb/coverage.out -tags acceptance ./test/acceptance/mariadb
+    command: go test -count 1 -race -coverpkg=./... -coverprofile=./test/acceptance/mariadb/coverage.out -tags acceptance ./test/acceptance/mariadb
 
   mariadb:
     image: "mariadb:10.9-jammy"
@@ -34,7 +34,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: go test -race -coverpkg=./... -coverprofile=./test/acceptance/postgres/coverage.out -tags acceptance ./test/acceptance/postgres
+    command: go test -count 1 -race -coverpkg=./... -coverprofile=./test/acceptance/postgres/coverage.out -tags acceptance ./test/acceptance/postgres
 
   postgres:
     image: "postgres:16-bookworm"
@@ -59,7 +59,7 @@ services:
     depends_on:
       mssql:
         condition: service_healthy
-    command: go test -race -coverpkg=./... -coverprofile=./test/acceptance/mssql/coverage.out -tags acceptance ./test/acceptance/mssql
+    command: go test -count 1 -race -coverpkg=./... -coverprofile=./test/acceptance/mssql/coverage.out -tags acceptance ./test/acceptance/mssql
 
 
   mssql:
