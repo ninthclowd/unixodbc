@@ -12,6 +12,7 @@ func init() {
 	sql.Register("unixodbc", driverInstance)
 }
 
+// OpenHandles reports the number of handles open to unixodbc. Useful in testing to ensure all handles are closed correctly.
 func OpenHandles() int64 {
 	return odbc.OpenHandles()
 }

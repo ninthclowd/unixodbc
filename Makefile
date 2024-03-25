@@ -4,6 +4,9 @@ build:
 	docker compose down --remove-orphans
 	docker compose build
 
+fmt:
+	go fmt ./...
+
 test: test-mariadb test-postgres test-mssql
 
 test-mariadb:

@@ -16,6 +16,8 @@ func (s StaticConnStr) ConnectionString() (string, error) {
 	return string(s), nil
 }
 
+// ConnectionStringFactory can be implemented to provide dynamic connection strings for each new connection to the
+// database, allowing for connections to systems that require token based authentication
 type ConnectionStringFactory interface {
 	ConnectionString() (string, error)
 }
@@ -25,16 +27,15 @@ var _ io.Closer = (*Connector)(nil)
 
 // Connector can be used with sql.OpenDB to allow more control of the unixodbc driver
 type Connector struct {
-	//ConnectionString is a factory that generates connection strings for each new connection that is opened.
+	// ConnectionString is a factory that generates connection strings for each new connection that is opened.
 	//Use StaticConnStr if you have a static connection string that does not need to change with each new connection.
 	//Ex: If you are connecting using a system DSN called "myDatabase", this could be:
 	//	StaticConnStr("DSN=myDatabase")
-	ConnectionString   ConnectionStringFactory
+	ConnectionString ConnectionStringFactory
+	// StatementCacheSize is the number of prepared statements to cache for each connection.  The driver will cache
+	// statements up to this limit and purge them using the least recently used algorithm.  0 will disable prepared
+	// statement caching.
 	StatementCacheSize int
-
-	UseODBCCursor bool   //SQL_ATTR_ODBC_CURSORS TODO
-	PacketSize    uint32 //SQL_ATTR_PACKET_SIZE TODO
-	TraceFile     string //SQL_ATTR_TRACEFILE TODO
 
 	odbcEnvironment *odbc.Environment
 }
