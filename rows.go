@@ -84,7 +84,7 @@ func (r *Rows) Next(dest []driver.Value) error {
 	}
 
 	errs := make(MultipleErrors)
-	for i, _ := range dest {
+	for i := range dest {
 		col := r.odbcRecordset.Column(i)
 		Tracer.WithRegion(r.ctx, "Scanning column "+col.Name(), func() {
 			dest[i], errs[col.Name()] = col.Value()

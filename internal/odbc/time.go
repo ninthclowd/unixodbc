@@ -5,6 +5,7 @@ import (
 	"github.com/ninthclowd/unixodbc/internal/api"
 	"reflect"
 	"time"
+	"unsafe"
 )
 
 func init() {
@@ -14,12 +15,12 @@ func init() {
 	)
 }
 
-func newTimeColumn(info *columnInfo, hnd handle) Column {
+func newTimeColumn(info *columnInfo, hnd *handle) Column {
 	return &columnTime{hnd, info}
 }
 
 type columnTime struct {
-	handle
+	*handle
 	*columnInfo
 }
 
@@ -37,8 +38,14 @@ func (c *columnTime) Decimal() (precision int64, scale int64, ok bool) {
 
 func (c *columnTime) Value() (driver.Value, error) {
 	var value api.SQL_TIME_STRUCT
+	defer value.Free()
 	var valueLength api.SQLLEN
-	if _, err := c.result(c.api().SQLGetData(api.SQLHSTMT(c.hnd()), c.columnNumber, api.SQL_C_TIME, api.SQLPOINTER(&value), 0, &valueLength)); err != nil {
+	if _, err := c.result(api.SQLGetData((*api.SQLHSTMT)(c.hnd()),
+		c.columnNumber,
+		api.SQL_C_TIME,
+		(*api.SQLPOINTER)(unsafe.Pointer(&value)),
+		0,
+		&valueLength)); err != nil {
 		return nil, err
 	}
 	if valueLength == api.SQL_NULL_DATA {

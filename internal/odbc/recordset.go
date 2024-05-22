@@ -59,7 +59,10 @@ func (rs *RecordSet) Unmarshal(out interface{}) error {
 			if dbVal.CanConvert(propType) {
 				dbVal = dbVal.Convert(propType)
 			} else {
-				return fmt.Errorf("mapping [%s]: cannot convert database type [%s] to [%s]", property.Name, dbVal.Type().Name(), propType.Name())
+				return fmt.Errorf("mapping [%s]: cannot convert database type [%s] to [%s]",
+					property.Name,
+					dbVal.Type().Name(),
+					propType.Name())
 			}
 		}
 		propVal.Set(dbVal)

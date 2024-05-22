@@ -55,14 +55,14 @@ func (c *Connector) initEnvironment(ctx context.Context) (err error) {
 	defer trace.End()
 
 	Tracer.WithRegion(ctx, "initializing ODBC environment", func() {
-		env, err = odbc.NewEnvironment(nil)
+		env, err = odbc.NewEnvironment()
 	})
 	if err != nil {
 		return
 	}
 
 	Tracer.WithRegion(ctx, "setting version", func() {
-		err = env.SetVersion(odbc.Version3_80)
+		err = env.SetVersion(odbc.Version380)
 	})
 	if err != nil {
 		return

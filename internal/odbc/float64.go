@@ -4,6 +4,7 @@ import (
 	"database/sql/driver"
 	"github.com/ninthclowd/unixodbc/internal/api"
 	"reflect"
+	"unsafe"
 )
 
 func init() {
@@ -15,12 +16,12 @@ func init() {
 	)
 }
 
-func newFloat64Column(info *columnInfo, hnd handle) Column {
+func newFloat64Column(info *columnInfo, hnd *handle) Column {
 	return &columnFloat64{hnd, info}
 }
 
 type columnFloat64 struct {
-	handle
+	*handle
 	*columnInfo
 }
 
@@ -39,7 +40,12 @@ func (c *columnFloat64) Decimal() (precision int64, scale int64, ok bool) {
 func (c *columnFloat64) Value() (driver.Value, error) {
 	var value api.SQLDOUBLE
 	var valueLength api.SQLLEN
-	if _, err := c.result(c.api().SQLGetData(api.SQLHSTMT(c.hnd()), c.columnNumber, api.SQL_C_DOUBLE, api.SQLPOINTER(&value), 0, &valueLength)); err != nil {
+	if _, err := c.result(api.SQLGetData((*api.SQLHSTMT)(c.hnd()),
+		c.columnNumber,
+		api.SQL_C_DOUBLE,
+		(*api.SQLPOINTER)(unsafe.Pointer(&value)),
+		0,
+		&valueLength)); err != nil {
 		return nil, err
 	}
 	if valueLength == api.SQL_NULL_DATA {
@@ -49,10 +55,15 @@ func (c *columnFloat64) Value() (driver.Value, error) {
 }
 
 func (s *Statement) bindFloat64(index int, value float64) error {
-	_, err := s.result(s.api().SQLBindParameter((api.SQLHSTMT)(s.hnd()), api.SQLUSMALLINT(index+1), api.SQL_PARAM_INPUT,
-		api.SQL_C_DOUBLE, api.SQL_DOUBLE,
-		0, 0,
-		api.SQLPOINTER(&value),
-		0, nil))
+	_, err := s.result(api.SQLBindParameter((*api.SQLHSTMT)(s.hnd()),
+		api.SQLUSMALLINT(index+1),
+		api.SQL_PARAM_INPUT,
+		api.SQL_C_DOUBLE,
+		api.SQL_DOUBLE,
+		0,
+		0,
+		(*api.SQLPOINTER)(unsafe.Pointer(&value)),
+		0,
+		nil))
 	return err
 }

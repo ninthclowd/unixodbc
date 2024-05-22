@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"errors"
 	"fmt"
 	"github.com/ninthclowd/unixodbc/internal/cache"
 	"github.com/ninthclowd/unixodbc/internal/odbc"
@@ -18,7 +19,6 @@ var (
 	_ driver.Pinger             = (*Connection)(nil)
 	_ driver.Conn               = (*Connection)(nil)
 	_ driver.NamedValueChecker  = (*Connection)(nil)
-	_ driver.SessionResetter    = (*Connection)(nil)
 	_ driver.Validator          = (*Connection)(nil)
 )
 
@@ -43,12 +43,6 @@ func (c *Connection) IsValid() bool {
 	}
 	//TODO return false on cancelled queries?
 	return true
-}
-
-// ResetSession implements driver.SessionResetter
-func (c *Connection) ResetSession(ctx context.Context) error {
-	//TODO implement me
-	return nil
 }
 
 // CheckNamedValue implements driver.NamedValueChecker
@@ -200,7 +194,7 @@ func (c *Connection) ExecContext(ctx context.Context, query string, args []drive
 	}
 	defer func() {
 		Tracer.WithRegion(ctx, "Close statement", func() {
-			st.Close()
+			_ = st.Close()
 		})
 	}()
 	Tracer.WithRegion(ctx, "Bind parameters", func() {
@@ -268,13 +262,12 @@ func (c *Connection) Ping(ctx context.Context) error {
 	if c.odbcConnection == nil {
 		return driver.ErrBadConn
 	}
-	switch err := c.odbcConnection.Ping(); err {
-	case odbc.ErrConnectionDead:
+	switch err := c.odbcConnection.Ping(); {
+	case errors.Is(err, odbc.ErrConnectionDead):
 		return driver.ErrBadConn
 	default:
 		return err
 	}
-	return nil
 }
 
 func toValues(args []driver.NamedValue) (values []interface{}) {

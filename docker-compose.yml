@@ -1,4 +1,3 @@
-version: "3.8"
 services:
   mariadb_test:
     build: test/acceptance/mariadb/container

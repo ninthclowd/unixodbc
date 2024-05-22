@@ -30,8 +30,8 @@ func newTestConnection(t *testing.T) (db *sql.DB, conn *sql.Conn, ctx context.Co
 
 	finish = func() {
 		cancel()
-		conn.Close()
-		db.Close()
+		_ = conn.Close()
+		_ = db.Close()
 		if count := unixodbc.OpenHandles(); count > 0 {
 			t.Fatalf("%d open ODBC handles", count)
 		}

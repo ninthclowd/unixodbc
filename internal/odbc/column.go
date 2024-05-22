@@ -34,7 +34,7 @@ func (i *columnInfo) Nullable() (nullable bool, ok bool) {
 	return i.nullable == api.SQL_NULLABLE, i.nullable != api.SQL_NULLABLE_UNKNOWN
 }
 
-type columnFactory func(info *columnInfo, hnd handle) Column
+type columnFactory func(info *columnInfo, hnd *handle) Column
 
 var registeredColumnFactory = map[api.SQLSMALLINT]columnFactory{}
 
@@ -48,9 +48,9 @@ func registerColumnFactoryForType(column columnFactory, types ...api.SQLSMALLINT
 	}
 }
 
-func columnsForStatement(h handle, loadColumn columnLoaderFN) (*columnsDetails, error) {
+func columnsForStatement(h *handle, loadColumn columnLoaderFN) (*columnsDetails, error) {
 	var columnCount api.SQLSMALLINT
-	if _, err := h.result(h.api().SQLNumResultCols((api.SQLHSTMT)(h.hnd()), &columnCount)); err != nil {
+	if _, err := h.result(api.SQLNumResultCols((*api.SQLHSTMT)(h.hnd()), &columnCount)); err != nil {
 		return nil, fmt.Errorf("getting column count: %w", err)
 	}
 	details := &columnsDetails{
@@ -73,14 +73,14 @@ func columnsForStatement(h handle, loadColumn columnLoaderFN) (*columnsDetails, 
 
 type columnLoaderFN func(i int) (Column, error)
 
-func newColumnLoader(h handle) columnLoaderFN {
+func newColumnLoader(h *handle) columnLoaderFN {
 	return func(i int) (Column, error) {
 		info := &columnInfo{columnNumber: api.SQLUSMALLINT(i + 1)}
 		name := make([]uint16, 100)
 		var nameLength api.SQLSMALLINT
-		_, err := h.result(h.api().SQLDescribeCol((api.SQLHSTMT)(h.hnd()),
+		_, err := h.result(api.SQLDescribeColW((*api.SQLHSTMT)(h.hnd()),
 			info.columnNumber,
-			&name,
+			(*api.SQLWCHAR)(&name[0]),
 			api.SQLSMALLINT(len(name)),
 			&nameLength,
 			&info.dataType,

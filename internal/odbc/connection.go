@@ -1,9 +1,11 @@
 package odbc
 
+import "C"
 import (
 	"errors"
 	"fmt"
 	"github.com/ninthclowd/unixodbc/internal/api"
+	"unsafe"
 )
 
 var (
@@ -29,13 +31,17 @@ const (
 )
 
 type Connection struct {
-	handle
+	*handle
 	env *Environment
 }
 
 func (c *Connection) Ping() error {
-	var dead api.SQLINTEGER
-	_, err := c.result(c.api().SQLGetConnectAttr((api.SQLHDBC)(c.hnd()), api.SQL_ATTR_CONNECTION_DEAD, api.SQLPOINTER(&dead), 0, nil))
+	var dead api.SQLBIGINT
+	_, err := c.result(api.SQLGetConnectAttr((*api.SQLHDBC)(c.hnd()),
+		api.SQL_ATTR_CONNECTION_DEAD,
+		(*api.SQLPOINTER)(unsafe.Pointer(&dead)),
+		0,
+		nil))
 	if err != nil {
 		return err
 	}
@@ -46,7 +52,7 @@ func (c *Connection) Ping() error {
 }
 
 func (c *Connection) Close() error {
-	if _, err := c.result(c.api().SQLDisconnect((api.SQLHDBC)(c.hnd()))); err != nil {
+	if _, err := c.result(api.SQLDisconnect((*api.SQLHDBC)(c.hnd()))); err != nil {
 		return fmt.Errorf("disconnecting: %w", err)
 	}
 	return c.free()
@@ -75,26 +81,35 @@ func (c *Connection) SetAutoCommit(autoCommit bool) error {
 	if !autoCommit {
 		val = api.SQL_AUTOCOMMIT_OFF
 	}
-	_, err := c.result(c.api().SQLSetConnectAttrConst((api.SQLHDBC)(c.hnd()), api.SQL_ATTR_AUTOCOMMIT, val))
+	_, err := c.result(api.SQLSetConnectAttr((*api.SQLHDBC)(c.hnd()),
+		api.SQL_ATTR_AUTOCOMMIT,
+		api.Const(val),
+		api.SQL_IS_UINTEGER))
 	return err
 }
 
 func (c *Connection) SetReadOnlyMode(readOnly ReadOnlyMode) error {
-	_, err := c.result(c.api().SQLSetConnectAttrConst((api.SQLHDBC)(c.hnd()), api.SQL_ATTR_ACCESS_MODE, uint64(readOnly)))
+	_, err := c.result(api.SQLSetConnectAttr((*api.SQLHDBC)(c.hnd()),
+		api.SQL_ATTR_ACCESS_MODE,
+		api.Const(uint64(readOnly)),
+		api.SQL_IS_UINTEGER))
 	return err
 }
 
 func (c *Connection) SetIsolationLevel(level IsolationLevel) error {
-	_, err := c.result(c.api().SQLSetConnectAttrConst((api.SQLHDBC)(c.hnd()), api.SQL_ATTR_TXN_ISOLATION, uint64(level)))
+	_, err := c.result(api.SQLSetConnectAttr((*api.SQLHDBC)(c.hnd()),
+		api.SQL_ATTR_TXN_ISOLATION,
+		api.Const(uint64(level)),
+		api.SQL_IS_UINTEGER))
 	return err
 }
 
 func (c *Connection) Commit() error {
-	_, err := c.result(c.api().SQLEndTran(api.SQL_HANDLE_DBC, c.hnd(), api.SQL_COMMIT))
+	_, err := c.result(api.SQLEndTran(api.SQL_HANDLE_DBC, c.hnd(), api.SQL_COMMIT))
 	return err
 }
 
 func (c *Connection) Rollback() error {
-	_, err := c.result(c.api().SQLEndTran(api.SQL_HANDLE_DBC, c.hnd(), api.SQL_ROLLBACK))
+	_, err := c.result(api.SQLEndTran(api.SQL_HANDLE_DBC, c.hnd(), api.SQL_ROLLBACK))
 	return err
 }

@@ -12,12 +12,12 @@ func init() {
 	registerColumnFactoryForType(newTimestampColumn, api.SQL_TYPE_TIMESTAMP)
 }
 
-func newTimestampColumn(info *columnInfo, hnd handle) Column {
+func newTimestampColumn(info *columnInfo, hnd *handle) Column {
 	return &columnTimestamp{hnd, info}
 }
 
 type columnTimestamp struct {
-	handle
+	*handle
 	*columnInfo
 }
 
@@ -35,8 +35,14 @@ func (c *columnTimestamp) Decimal() (precision int64, scale int64, ok bool) {
 
 func (c *columnTimestamp) Value() (driver.Value, error) {
 	var value api.SQL_TIMESTAMP_STRUCT
+	defer value.Free()
 	var valueLength api.SQLLEN
-	if _, err := c.result(c.api().SQLGetData(api.SQLHSTMT(c.hnd()), c.columnNumber, api.SQL_C_TIMESTAMP, api.SQLPOINTER(&value), 0, &valueLength)); err != nil {
+	if _, err := c.result(api.SQLGetData((*api.SQLHSTMT)(c.hnd()),
+		c.columnNumber,
+		api.SQL_C_TIMESTAMP,
+		(*api.SQLPOINTER)(unsafe.Pointer(&value)),
+		0,
+		&valueLength)); err != nil {
 		return nil, err
 	}
 	if valueLength == api.SQL_NULL_DATA {
@@ -55,12 +61,19 @@ func (s *Statement) bindTimestamp(index int, value *time.Time) error {
 		Second:   api.SQLUSMALLINT(value.Second()),
 		Fraction: api.SQLUINTEGER(value.Nanosecond()),
 	}
+	defer ts.Free()
 
 	sz := unsafe.Sizeof(ts)
-	_, err := s.result(s.api().SQLBindParameter((api.SQLHSTMT)(s.hnd()), api.SQLUSMALLINT(index+1), api.SQL_PARAM_INPUT,
-		api.SQL_C_TIMESTAMP, api.SQL_TYPE_TIMESTAMP,
-		api.SQLULEN(sz), 0,
-		api.SQLPOINTER(&ts),
-		0, nil))
+	_, err := s.result(api.SQLBindParameter((*api.SQLHSTMT)(s.hnd()),
+		api.SQLUSMALLINT(index+1),
+		api.SQL_PARAM_INPUT,
+		api.SQL_C_TIMESTAMP,
+		api.SQL_TYPE_TIMESTAMP,
+		api.SQLULEN(sz),
+		0,
+		(*api.SQLPOINTER)(unsafe.Pointer(&ts)),
+		0,
+		nil))
+
 	return err
 }

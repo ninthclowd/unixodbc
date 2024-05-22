@@ -27,7 +27,7 @@ func OpenHandles() int64 {
 	return openHandleCount.Load()
 }
 
-func cancelHandleOnContext(ctx context.Context, h handle) (done func()) {
+func cancelHandleOnContext(ctx context.Context, h *handle) (done func()) {
 	var wg sync.WaitGroup
 	closer := make(chan struct{}, 1)
 
@@ -56,64 +56,48 @@ var errorMap = map[api.SQLRETURN]error{
 	api.SQL_INVALID_HANDLE:    ErrInvalidHandle,
 }
 
-type handle interface {
-	result(r api.SQLRETURN) (api.SQLRETURN, error)
-	hnd() api.SQLHANDLE
-	hndType() api.SQLSMALLINT
-	cancel() error
-	free() error
-	api() odbcAPI
-	child(handleType api.SQLSMALLINT) (handle, error)
-}
-
-type handleImpl struct {
-	cAPI    odbcAPI
-	ptr     api.SQLHANDLE
+type handle struct {
+	ptr     *api.SQLHANDLE
 	ptrType api.SQLSMALLINT
 	ptrMux  sync.RWMutex
 }
 
-func newEnvHandle(cAPI odbcAPI) (handle, error) {
-	hnd := &handleImpl{
-		cAPI:    cAPI,
+func newEnvHandle() (*handle, error) {
+	hnd := &handle{
 		ptrType: api.SQL_HANDLE_ENV,
 	}
 
-	if r := cAPI.SQLAllocHandle(api.SQL_HANDLE_ENV, nil, &hnd.ptr); r == api.SQL_ERROR {
+	if r := api.SQLAllocHandle(api.SQL_HANDLE_ENV, nil, &hnd.ptr); r == api.SQL_ERROR {
 		return nil, fmt.Errorf("unable to alloc env handle: %d", (int)(r))
 	}
 	openHandleCount.Add(1)
 	return hnd, nil
 }
 
-func (h *handleImpl) api() odbcAPI {
-	return h.cAPI
-}
-
-func (h *handleImpl) hnd() api.SQLHANDLE {
+func (h *handle) hnd() *api.SQLHANDLE {
 	h.ptrMux.RLock()
 	defer h.ptrMux.RUnlock()
 	return h.ptr
 }
 
-func (h *handleImpl) hndType() api.SQLSMALLINT {
+func (h *handle) hndType() api.SQLSMALLINT {
 	return h.ptrType
 }
 
-func (h *handleImpl) cancel() error {
-	if code := h.cAPI.SQLCancelHandle(h.ptrType, h.hnd()); code != api.SQL_SUCCESS {
+func (h *handle) cancel() error {
+	if code := api.SQLCancelHandle(h.ptrType, h.hnd()); code != api.SQL_SUCCESS {
 		return fmt.Errorf("received code %d when cancelling handle", code)
 	}
 	return nil
 }
 
-func (h *handleImpl) free() error {
+func (h *handle) free() error {
 	h.ptrMux.Lock()
 	defer h.ptrMux.Unlock()
 	if h.ptr == nil {
 		return ErrHandleFreed
 	}
-	if code := h.cAPI.SQLFreeHandle(h.ptrType, h.ptr); code != api.SQL_SUCCESS {
+	if code := api.SQLFreeHandle(h.ptrType, h.ptr); code != api.SQL_SUCCESS {
 		return fmt.Errorf("received code %d when freeing handle", code)
 	}
 	openHandleCount.Add(-1)
@@ -121,9 +105,9 @@ func (h *handleImpl) free() error {
 	return nil
 }
 
-func (h *handleImpl) child(handleType api.SQLSMALLINT) (handle, error) {
-	hnd := &handleImpl{cAPI: h.cAPI, ptrType: handleType}
-	if _, err := h.result(h.cAPI.SQLAllocHandle(handleType, h.hnd(), &hnd.ptr)); err != nil {
+func (h *handle) child(handleType api.SQLSMALLINT) (*handle, error) {
+	hnd := &handle{ptrType: handleType}
+	if _, err := h.result(api.SQLAllocHandle(handleType, h.hnd(), &hnd.ptr)); err != nil {
 		return nil, err
 	}
 	openHandleCount.Add(1)
@@ -131,7 +115,7 @@ func (h *handleImpl) child(handleType api.SQLSMALLINT) (handle, error) {
 	return hnd, nil
 }
 
-func (h *handleImpl) result(r api.SQLRETURN) (api.SQLRETURN, error) {
+func (h *handle) result(r api.SQLRETURN) (api.SQLRETURN, error) {
 	if err, found := errorMap[r]; found {
 		return r, err
 	}
@@ -142,7 +126,7 @@ func (h *handleImpl) result(r api.SQLRETURN) (api.SQLRETURN, error) {
 	}
 }
 
-func (h *handleImpl) getDiagRecs() ([]*DiagRec, error) {
+func (h *handle) getDiagRecs() ([]*DiagRec, error) {
 	records := make([]*DiagRec, 0)
 	for i := 1; ; i++ {
 		var nativeError api.SQLINTEGER
@@ -152,11 +136,11 @@ func (h *handleImpl) getDiagRecs() ([]*DiagRec, error) {
 		var msgSize api.SQLSMALLINT
 		recordNumber := api.SQLSMALLINT(i)
 
-		ret := h.cAPI.SQLGetDiagRecW(h.ptrType, h.hnd(),
+		ret := api.SQLGetDiagRecW(h.ptrType, h.hnd(),
 			recordNumber,
-			&sqlState,
+			(*api.SQLWCHAR)(&sqlState[0]),
 			&nativeError,
-			&messageText,
+			(*api.SQLWCHAR)(&messageText[0]),
 			api.SQLSMALLINT(len(messageText)),
 			&msgSize,
 		)

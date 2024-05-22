@@ -17,7 +17,7 @@ func newTestStatement(t *testing.T) (stmt *sql.Stmt, ctx context.Context, finish
 		t.Fatalf("expected no error from PrepareContext, got: %s", err.Error())
 	}
 	finish = func() {
-		stmt.Close()
+		_ = stmt.Close()
 		done()
 	}
 	return
