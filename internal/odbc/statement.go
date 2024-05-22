@@ -28,13 +28,29 @@ const (
 	ConcurrencyLock = Concurrency(api.SQL_CONCUR_LOCK)
 )
 
-type Statement struct {
-	*handle
-	conn *Connection
-	rs   *RecordSet
+//go:generate mockgen -source=statement.go -package mocks -destination ../mocks/statement.go
+type Statement interface {
+	SetCursorSensitivity(sensitivity CursorSensitivity) error
+	SetConcurrency(concurrency Concurrency) error
+	NumParams() (int, error)
+	ResetParams() error
+	Close() error
+	ExecDirect(ctx context.Context, sql string) error
+	Execute(ctx context.Context) error
+	Prepare(ctx context.Context, sql string) error
+	BindParams(params ...interface{}) error
+	RecordSet() (RecordSet, error)
 }
 
-func (s *Statement) SetCursorSensitivity(sensitivity CursorSensitivity) error {
+var _ Statement = (*statement)(nil)
+
+type statement struct {
+	*handle
+	conn *connection
+	rs   *recordSet
+}
+
+func (s *statement) SetCursorSensitivity(sensitivity CursorSensitivity) error {
 	_, err := s.result(api.SQLSetStmtAttr((*api.SQLHSTMT)(s.hnd()),
 		api.SQL_ATTR_CURSOR_SENSITIVITY,
 		api.Const(uint64(sensitivity)),
@@ -42,7 +58,7 @@ func (s *Statement) SetCursorSensitivity(sensitivity CursorSensitivity) error {
 	return err
 }
 
-func (s *Statement) SetConcurrency(concurrency Concurrency) error {
+func (s *statement) SetConcurrency(concurrency Concurrency) error {
 	_, err := s.result(api.SQLSetStmtAttr((*api.SQLHSTMT)(s.hnd()),
 		api.SQL_ATTR_CONCURRENCY,
 		api.Const(uint64(concurrency)),
@@ -50,7 +66,7 @@ func (s *Statement) SetConcurrency(concurrency Concurrency) error {
 	return err
 }
 
-func (s *Statement) NumParams() (int, error) {
+func (s *statement) NumParams() (int, error) {
 	var paramCount api.SQLSMALLINT
 	if _, err := s.result(api.SQLNumParams((*api.SQLHSTMT)(s.hnd()), &paramCount)); err != nil {
 		return 0, fmt.Errorf("getting Parameter count: %w", err)
@@ -58,19 +74,19 @@ func (s *Statement) NumParams() (int, error) {
 	return int(paramCount), nil
 }
 
-func (s *Statement) ResetParams() error {
+func (s *statement) ResetParams() error {
 	_, err := s.result(api.SQLFreeStmt((*api.SQLHSTMT)(s.hnd()), api.SQL_RESET_PARAMS))
 	return err
 }
 
-func (s *Statement) Close() error {
+func (s *statement) Close() error {
 	if _, err := s.result(api.SQLFreeStmt((*api.SQLHSTMT)(s.hnd()), api.SQL_CLOSE)); err != nil {
-		return fmt.Errorf("freeing Statement: %w", err)
+		return fmt.Errorf("freeing statement: %w", err)
 	}
 	return s.free()
 }
 
-func (s *Statement) ExecDirect(ctx context.Context, sql string) error {
+func (s *statement) ExecDirect(ctx context.Context, sql string) error {
 	done := cancelHandleOnContext(ctx, s.handle)
 
 	statementBytes := utf16.Encode([]rune(sql))
@@ -84,7 +100,7 @@ func (s *Statement) ExecDirect(ctx context.Context, sql string) error {
 	return err
 }
 
-func (s *Statement) Execute(ctx context.Context) error {
+func (s *statement) Execute(ctx context.Context) error {
 	done := cancelHandleOnContext(ctx, s.handle)
 	_, err := s.result(api.SQLExecute((*api.SQLHSTMT)(s.hnd())))
 	done()
@@ -94,7 +110,7 @@ func (s *Statement) Execute(ctx context.Context) error {
 	return err
 }
 
-func (s *Statement) Prepare(ctx context.Context, sql string) error {
+func (s *statement) Prepare(ctx context.Context, sql string) error {
 	done := cancelHandleOnContext(ctx, s.handle)
 
 	statementBytes := utf16.Encode([]rune(sql))
@@ -108,7 +124,7 @@ func (s *Statement) Prepare(ctx context.Context, sql string) error {
 	return err
 }
 
-func (s *Statement) RecordSet() (*RecordSet, error) {
+func (s *statement) RecordSet() (RecordSet, error) {
 	if s.rs != nil {
 		return nil, ErrRecordSetOpen
 	}
@@ -117,11 +133,11 @@ func (s *Statement) RecordSet() (*RecordSet, error) {
 		return nil, err
 	}
 
-	s.rs = &RecordSet{stmt: s, columns: col}
+	s.rs = &recordSet{stmt: s, columns: col}
 	return s.rs, nil
 }
 
-func (s *Statement) closeCursor() error {
+func (s *statement) closeCursor() error {
 	if _, err := s.result(api.SQLCloseCursor((*api.SQLHSTMT)(s.hnd()))); err != nil {
 		return fmt.Errorf("closing cursor: %w", err)
 	}
@@ -129,7 +145,7 @@ func (s *Statement) closeCursor() error {
 	return nil
 }
 
-func (s *Statement) fetch() (more bool, err error) {
+func (s *statement) fetch() (more bool, err error) {
 	if code, err := s.result(api.SQLFetch((*api.SQLHSTMT)(s.hnd()))); err != nil {
 		return false, err
 	} else if code == api.SQL_NO_DATA {
@@ -138,7 +154,7 @@ func (s *Statement) fetch() (more bool, err error) {
 	return true, nil
 }
 
-func (s *Statement) BindParams(params ...interface{}) error {
+func (s *statement) BindParams(params ...interface{}) error {
 	for i, param := range params {
 		if err := s.bindParam(i, param); err != nil {
 			return err
@@ -147,7 +163,7 @@ func (s *Statement) BindParams(params ...interface{}) error {
 	return nil
 }
 
-func (s *Statement) bindParam(index int, value interface{}) error {
+func (s *statement) bindParam(index int, value interface{}) error {
 	value = compressInt(value) //TODO, benchmark don't switch on non int types
 	switch value.(type) {
 	case nil:
@@ -176,7 +192,7 @@ func (s *Statement) bindParam(index int, value interface{}) error {
 	}
 }
 
-func (s *Statement) bindNil(index int) error {
+func (s *statement) bindNil(index int) error {
 	strLenOrIndPtr := api.SQLLEN(api.SQL_NULL_DATA)
 	_, err := s.result(api.SQLBindParameter((*api.SQLHSTMT)(s.hnd()),
 		api.SQLUSMALLINT(index+1),

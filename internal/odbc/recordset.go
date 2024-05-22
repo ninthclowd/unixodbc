@@ -5,12 +5,25 @@ import (
 	"reflect"
 )
 
-type RecordSet struct {
-	stmt    *Statement
+//go:generate mockgen -source=recordset.go -package mocks -destination ../mocks/recordset.go
+type RecordSet interface {
+	Close() error
+	Statement() Statement
+	Fetch() (more bool, err error)
+	Unmarshal(out interface{}) error
+	ColumnWithName(name string) Column
+	Column(index int) Column
+	ColumnNames() []string
+}
+
+var _ RecordSet = (*recordSet)(nil)
+
+type recordSet struct {
+	stmt    *statement
 	columns *columnsDetails
 }
 
-func (rs *RecordSet) Close() error {
+func (rs *recordSet) Close() error {
 	if err := rs.stmt.closeCursor(); err != nil {
 		return fmt.Errorf("closing cursor: %w", err)
 	}
@@ -19,15 +32,15 @@ func (rs *RecordSet) Close() error {
 	return nil
 }
 
-func (rs *RecordSet) Statement() *Statement {
+func (rs *recordSet) Statement() Statement {
 	return rs.stmt
 }
 
-func (rs *RecordSet) Fetch() (more bool, err error) {
+func (rs *recordSet) Fetch() (more bool, err error) {
 	return rs.stmt.fetch()
 }
 
-func (rs *RecordSet) Unmarshal(out interface{}) error {
+func (rs *recordSet) Unmarshal(out interface{}) error {
 	configStruct, ok := out.(reflect.Value)
 	if !ok {
 		configStruct = reflect.ValueOf(out).Elem()
@@ -71,17 +84,17 @@ func (rs *RecordSet) Unmarshal(out interface{}) error {
 	return nil
 }
 
-func (rs *RecordSet) ColumnWithName(name string) Column {
+func (rs *recordSet) ColumnWithName(name string) Column {
 	if col, ok := rs.columns.byName[name]; ok {
 		return col
 	}
 	return nil
 }
 
-func (rs *RecordSet) Column(index int) Column {
+func (rs *recordSet) Column(index int) Column {
 	return rs.columns.byIndex[index]
 }
 
-func (rs *RecordSet) ColumnNames() []string {
+func (rs *recordSet) ColumnNames() []string {
 	return rs.columns.names
 }

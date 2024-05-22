@@ -8,7 +8,7 @@ import (
 	"unicode/utf16"
 )
 
-//go:generate mockgen -source=column.go -package odbc -destination column_mock_test.go
+//go:generate mockgen -source=column.go -package mocks -destination ../mocks/column.go
 type Column interface {
 	driver.Valuer
 	Name() string

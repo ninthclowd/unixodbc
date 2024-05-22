@@ -13,7 +13,7 @@ var (
 )
 
 type PreparedStatement struct {
-	odbcStatement *odbc.Statement
+	odbcStatement odbc.Statement
 	query         string
 	conn          *Connection
 	rows          *Rows
@@ -43,7 +43,7 @@ func (s *PreparedStatement) Exec(args []driver.Value) (driver.Result, error) {
 
 // ExecContext implements driver.StmtExecContext
 func (s *PreparedStatement) ExecContext(ctx context.Context, args []driver.NamedValue) (driver.Result, error) {
-	ctx, trace := Tracer.NewTask(ctx, "Statement::ExecContext")
+	ctx, trace := Tracer.NewTask(ctx, "statement::ExecContext")
 	defer trace.End()
 	var err error
 	Tracer.WithRegion(ctx, "BindParams", func() {
@@ -68,7 +68,7 @@ func (s *PreparedStatement) Query(args []driver.Value) (driver.Rows, error) {
 
 // QueryContext implements driver.StmtQueryContext
 func (s *PreparedStatement) QueryContext(ctx context.Context, args []driver.NamedValue) (driver.Rows, error) {
-	ctx, trace := Tracer.NewTask(ctx, "Statement::QueryContext")
+	ctx, trace := Tracer.NewTask(ctx, "statement::QueryContext")
 	defer trace.End()
 	var err error
 	Tracer.WithRegion(ctx, "BindParams", func() {
@@ -84,8 +84,8 @@ func (s *PreparedStatement) QueryContext(ctx context.Context, args []driver.Name
 		return nil, err
 	}
 
-	var rs *odbc.RecordSet
-	Tracer.WithRegion(ctx, "RecordSet", func() {
+	var rs odbc.RecordSet
+	Tracer.WithRegion(ctx, "recordSet", func() {
 		rs, err = s.odbcStatement.RecordSet()
 	})
 	if err != nil {

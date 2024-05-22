@@ -37,7 +37,7 @@ type Connector struct {
 	// statement caching.
 	StatementCacheSize int
 
-	odbcEnvironment *odbc.Environment
+	odbcEnvironment odbc.Environment
 }
 
 // Close implements io.Closer
@@ -49,9 +49,9 @@ func (c *Connector) initEnvironment(ctx context.Context) (err error) {
 	if c.odbcEnvironment != nil {
 		return nil
 	}
-	var env *odbc.Environment
+	var env odbc.Environment
 
-	ctx, trace := Tracer.NewTask(ctx, "Connection::initEnvironment")
+	ctx, trace := Tracer.NewTask(ctx, "connection::initEnvironment")
 	defer trace.End()
 
 	Tracer.WithRegion(ctx, "initializing ODBC environment", func() {

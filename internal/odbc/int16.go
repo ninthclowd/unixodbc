@@ -50,7 +50,7 @@ func (c *columnInt16) Value() (driver.Value, error) {
 }
 
 //go:nocheckptr
-func (s *Statement) bindInt16(index int, value int16) error {
+func (s *statement) bindInt16(index int, value int16) error {
 	_, err := s.result(api.SQLBindParameter((*api.SQLHSTMT)(s.hnd()),
 		api.SQLUSMALLINT(index+1),
 		api.SQL_PARAM_INPUT,

@@ -47,7 +47,7 @@ func (c *columnInt64) Value() (driver.Value, error) {
 	return int64(value), nil
 }
 
-func (s *Statement) bindInt64(index int, value int64) error {
+func (s *statement) bindInt64(index int, value int64) error {
 	_, err := s.result(api.SQLBindParameter((*api.SQLHSTMT)(s.hnd()),
 		api.SQLUSMALLINT(index+1),
 		api.SQL_PARAM_INPUT,

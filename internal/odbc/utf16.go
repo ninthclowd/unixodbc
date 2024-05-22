@@ -61,7 +61,7 @@ func (c *columnUTF16) Value() (driver.Value, error) {
 }
 
 //go:nocheckptr
-func (s *Statement) bindUTF16(index int, src string) error {
+func (s *statement) bindUTF16(index int, src string) error {
 	nts := make([]rune, len(src)+1)
 	for i, r := range src {
 		nts[i] = r

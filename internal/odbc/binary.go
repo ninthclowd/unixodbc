@@ -63,7 +63,7 @@ func (c *columnBinary) Value() (driver.Value, error) {
 }
 
 //go:nocheckptr
-func (s *Statement) bindBinary(index int, src []byte) error {
+func (s *statement) bindBinary(index int, src []byte) error {
 	execSize := api.SQLLEN(len(src))
 	_, err := s.result(api.SQLBindParameter((*api.SQLHSTMT)(s.hnd()),
 		api.SQLUSMALLINT(index+1),

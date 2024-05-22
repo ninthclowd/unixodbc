@@ -50,7 +50,7 @@ func (c *columnBool) Value() (driver.Value, error) {
 }
 
 //go:nocheckptr
-func (s *Statement) bindBool(index int, value bool) error {
+func (s *statement) bindBool(index int, value bool) error {
 	var data byte
 	if value {
 		data = 1

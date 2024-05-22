@@ -19,8 +19,8 @@ var _ driver.RowsColumnTypePrecisionScale = (*Rows)(nil)
 
 type Rows struct {
 	ctx                context.Context
-	odbcRecordset      *odbc.RecordSet
-	closeStmtOnRSClose *odbc.Statement
+	odbcRecordset      odbc.RecordSet
+	closeStmtOnRSClose odbc.Statement
 }
 
 // ColumnTypePrecisionScale implements driver.RowsColumnTypePrecisionScale

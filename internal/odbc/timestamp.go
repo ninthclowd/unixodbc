@@ -51,7 +51,7 @@ func (c *columnTimestamp) Value() (driver.Value, error) {
 	return time.Date(int(value.Year), time.Month(value.Month), int(value.Day), int(value.Hour), int(value.Minute), int(value.Second), int(value.Fraction), time.UTC), nil
 }
 
-func (s *Statement) bindTimestamp(index int, value *time.Time) error {
+func (s *statement) bindTimestamp(index int, value *time.Time) error {
 	ts := api.SQL_TIMESTAMP_STRUCT{
 		Year:     api.SQLSMALLINT(value.Year()),
 		Month:    api.SQLUSMALLINT(value.Month()),

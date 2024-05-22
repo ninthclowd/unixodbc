@@ -24,22 +24,32 @@ const (
 	Version2   = Version(api.SQL_OV_ODBC2)
 )
 
-func NewEnvironment() (*Environment, error) {
+//go:generate mockgen -source=environment.go -package mocks -destination ../mocks/environment.go
+type Environment interface {
+	SetVersion(version Version) error
+	SetPoolOption(option PoolOption) error
+	Connect(ctx context.Context, connStr string) (Connection, error)
+	Close() error
+}
+
+func NewEnvironment() (Environment, error) {
 	hnd, err := newEnvHandle()
 	if err != nil {
 		return nil, err
 	}
 
-	e := &Environment{handle: hnd}
+	e := &environment{handle: hnd}
 
 	return e, nil
 }
 
-type Environment struct {
+var _ Environment = (*environment)(nil)
+
+type environment struct {
 	*handle
 }
 
-func (e *Environment) SetVersion(version Version) error {
+func (e *environment) SetVersion(version Version) error {
 
 	_, err := e.result(api.SQLSetEnvAttr((*api.SQLHENV)(e.hnd()),
 		api.SQL_ATTR_ODBC_VERSION,
@@ -48,7 +58,7 @@ func (e *Environment) SetVersion(version Version) error {
 	return err
 }
 
-func (e *Environment) SetPoolOption(option PoolOption) error {
+func (e *environment) SetPoolOption(option PoolOption) error {
 	_, err := e.result(api.SQLSetEnvAttr((*api.SQLHENV)(e.hnd()),
 		api.SQL_ATTR_CONNECTION_POOLING,
 		api.Const(uint64(option)),
@@ -56,7 +66,7 @@ func (e *Environment) SetPoolOption(option PoolOption) error {
 	return err
 }
 
-func (e *Environment) Connect(ctx context.Context, connStr string) (*Connection, error) {
+func (e *environment) Connect(ctx context.Context, connStr string) (Connection, error) {
 	hnd, err := e.child(api.SQL_HANDLE_DBC)
 	if err != nil {
 		return nil, fmt.Errorf("unable to alloc new connection: %w", err)
@@ -86,10 +96,10 @@ func (e *Environment) Connect(ctx context.Context, connStr string) (*Connection,
 		return nil, err
 	}
 
-	return &Connection{handle: hnd, env: e}, nil
+	return &connection{handle: hnd, env: e}, nil
 
 }
 
-func (e *Environment) Close() error {
+func (e *environment) Close() error {
 	return e.free()
 }
