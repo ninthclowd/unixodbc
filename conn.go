@@ -19,6 +19,7 @@ var (
 	_ driver.Pinger             = (*Connection)(nil)
 	_ driver.Conn               = (*Connection)(nil)
 	_ driver.NamedValueChecker  = (*Connection)(nil)
+	_ driver.SessionResetter    = (*Connection)(nil)
 	_ driver.Validator          = (*Connection)(nil)
 )
 
@@ -43,6 +44,11 @@ func (c *Connection) IsValid() bool {
 	}
 	//TODO return false on cancelled queries?
 	return true
+}
+
+// ResetSession implements driver.SessionResetter
+func (c *Connection) ResetSession(ctx context.Context) error {
+	return nil
 }
 
 // CheckNamedValue implements driver.NamedValueChecker

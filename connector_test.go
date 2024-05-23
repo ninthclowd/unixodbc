@@ -24,12 +24,12 @@ func TestConnector_Connect(t *testing.T) {
 
 	ctx := context.Background()
 
-	mockConn := mocks.NewMockConnection(ctrl)
-
-	mockConn.EXPECT().SetAutoCommit(true).Return(nil).Times(1)
 	mockEnv.EXPECT().SetVersion(odbc.Version380).Return(nil).Times(1)
 	mockEnv.EXPECT().SetPoolOption(odbc.PoolOff).Return(nil).Times(1)
-	mockEnv.EXPECT().Connect(gomock.Any(), connString).Return(mockConn, nil)
+
+	mockConn1 := mocks.NewMockConnection(ctrl)
+	mockConn1.EXPECT().SetAutoCommit(true).Return(nil).Times(1)
+	mockEnv.EXPECT().Connect(gomock.Any(), connString).Return(mockConn1, nil).Times(1)
 
 	gotConn, err := connector.Connect(ctx)
 	if err != nil {
@@ -40,7 +40,7 @@ func TestConnector_Connect(t *testing.T) {
 		t.Fatalf("connection was unexpected, got %v", err)
 	}
 
-	if c.odbcConnection != mockConn {
+	if c.odbcConnection != mockConn1 {
 		t.Errorf("connection reference was unexpected, got %v", c.odbcConnection)
 	}
 	if capacity := c.cachedStatements.Capacity(); capacity != 5 {
@@ -49,6 +49,23 @@ func TestConnector_Connect(t *testing.T) {
 
 	if connector.Driver() != driverInstance {
 		t.Errorf("driver instance not set on connector, got %v", driverInstance)
+	}
+
+	mockConn2 := mocks.NewMockConnection(ctrl)
+	mockConn2.EXPECT().SetAutoCommit(true).Return(nil).Times(1)
+	mockEnv.EXPECT().Connect(gomock.Any(), connString).Return(mockConn2, nil).Times(1)
+
+	gotConn2, err := connector.Connect(ctx)
+	if err != nil {
+		t.Fatalf("expected no error connecting a second time, got %v", err)
+	}
+	c, ok = gotConn2.(*Connection)
+	if !ok {
+		t.Fatalf("second connection was unexpected, got %v", err)
+	}
+
+	if c.odbcConnection != mockConn2 {
+		t.Errorf("second connection reference was unexpected, got %v", c.odbcConnection)
 	}
 
 }
