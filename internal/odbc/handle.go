@@ -1,4 +1,3 @@
-//go:generate mockgen -source=handle.go -package odbc -destination handle_mock_test.go -mock_names handle=MockHandle
 package odbc
 
 import (

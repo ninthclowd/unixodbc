@@ -2,7 +2,6 @@ package cache_test
 
 import (
 	"errors"
-	"fmt"
 	"github.com/ninthclowd/unixodbc/internal/cache"
 	"strconv"
 	"testing"
@@ -161,86 +160,34 @@ func TestLRU_Get(t *testing.T) {
 	}
 	lru := cache.NewLRU[MyStruct](2, onEvict)
 
-	type Test struct {
-		putKey      string
-		putVal      *MyStruct
-		wantEvicted map[string]*MyStruct
-		wantGet     map[string]*MyStruct
-		wantLen     int
+	lru.Put("A", &itemA)
+	if len(evictions) > 0 {
+		t.Fatalf("expected no evictions but received: %d", len(evictions))
+	}
+	lru.Put("B", &itemB)
+	if len(evictions) > 0 {
+		t.Fatalf("expected no evictions but received: %d", len(evictions))
+	}
+	lru.Put("C", &itemC)
+	if gotItem, evicted := evictions["A"]; !evicted || gotItem != &itemA {
+		t.Fatalf("expected A to be evicted after adding C")
 	}
 
-	tests := []Test{
-		{
-			putKey: "A",
-			putVal: &itemA,
-			wantGet: map[string]*MyStruct{
-				"A": &itemA,
-			},
-			wantEvicted: nil,
-			wantLen:     1,
-		},
-		{
-			putKey: "B",
-			putVal: &itemB,
-			wantGet: map[string]*MyStruct{
-				"A": &itemA,
-				"B": &itemB,
-			},
-			wantEvicted: nil,
-			wantLen:     2,
-		},
-		{
-			putKey: "C",
-			putVal: &itemC,
-			wantGet: map[string]*MyStruct{
-				"B": &itemB,
-				"C": &itemC,
-			},
-			wantEvicted: map[string]*MyStruct{
-				"A": &itemA,
-			},
-			wantLen: 2,
-		},
-		{
-			putKey: "D",
-			putVal: &itemD,
-			wantGet: map[string]*MyStruct{
-				"C": &itemC,
-				"D": &itemD,
-			},
-			wantEvicted: map[string]*MyStruct{
-				"A": &itemA,
-				"B": &itemB,
-			},
-			wantLen: 2,
-		},
+	if got := lru.Get("B", false); got != &itemB {
+		t.Fatalf("expected B to still be in the cache")
 	}
 
-	for _, test := range tests {
-		t.Run(fmt.Sprintf("After adding %s", test.putKey), func(t *testing.T) {
+	lru.Put("D", &itemD)
+	if gotItem, evicted := evictions["C"]; !evicted || gotItem != &itemC {
+		t.Fatalf("expected C to be evicted after adding D since B was most recently accessed")
+	}
 
-			if err := lru.Put(test.putKey, test.putVal); err != nil {
-				t.Fatalf("expected no error from Put.  Got %v", err)
-			}
+	if got := lru.Get("D", true); got != &itemD {
+		t.Fatalf("expected D to still be in the cache")
+	}
 
-			for key, value := range test.wantGet {
-				if gotValue := lru.Get(key, false); gotValue != value {
-					t.Fatalf("item %s was expected to be loaded but was not", key)
-				}
-			}
-
-			for key, value := range test.wantEvicted {
-				if gotValue := lru.Get(key, false); gotValue != nil {
-					t.Fatalf("item %s was expected to be evicted but was not", key)
-				}
-				if evictedValue, evicted := evictions[key]; !evicted {
-					t.Fatalf("expected onEvict to be called with putKey %s", key)
-				} else if evictedValue != value {
-					t.Fatalf("putVal sent to onEvict for putKey %v was unexpected", key)
-				}
-
-			}
-		})
+	if got := lru.Get("D", false); got != nil {
+		t.Fatalf("expected D to have been removed from the cache")
 	}
 }
 

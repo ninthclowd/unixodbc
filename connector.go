@@ -7,6 +7,7 @@ import (
 	"github.com/ninthclowd/unixodbc/internal/cache"
 	"github.com/ninthclowd/unixodbc/internal/odbc"
 	"io"
+	"sync"
 )
 
 // StaticConnStr converts a static connection string into ConnectionStringFactory usable by Connector
@@ -38,6 +39,9 @@ type Connector struct {
 	StatementCacheSize int
 
 	odbcEnvironment odbc.Environment
+
+	initialized bool
+	mux         sync.Mutex
 }
 
 // Close implements io.Closer
@@ -45,17 +49,20 @@ func (c *Connector) Close() error {
 	return c.odbcEnvironment.Close()
 }
 
-func (c *Connector) initEnvironment(ctx context.Context) (err error) {
+// initialize the environment if it has not already been done
+func (c *Connector) initialize(ctx context.Context) (err error) {
+	c.mux.Lock()
+	defer c.mux.Unlock()
+	if c.initialized {
+		return nil
+	}
 
-	env := c.odbcEnvironment
-
-	ctx, trace := Tracer.NewTask(ctx, "connection::initEnvironment")
+	ctx, trace := Tracer.NewTask(ctx, "connection::initialize")
 	defer trace.End()
 
 	if c.odbcEnvironment == nil {
-
 		Tracer.WithRegion(ctx, "initializing ODBC environment", func() {
-			env, err = odbc.NewEnvironment()
+			c.odbcEnvironment, err = odbc.NewEnvironment()
 		})
 		if err != nil {
 			return
@@ -63,7 +70,7 @@ func (c *Connector) initEnvironment(ctx context.Context) (err error) {
 	}
 
 	Tracer.WithRegion(ctx, "setting version", func() {
-		err = env.SetVersion(odbc.Version380)
+		err = c.odbcEnvironment.SetVersion(odbc.Version380)
 	})
 	if err != nil {
 		return
@@ -71,13 +78,13 @@ func (c *Connector) initEnvironment(ctx context.Context) (err error) {
 
 	//do not enable connection pooling at the driver level since go sql will be managing a connection pool
 	Tracer.WithRegion(ctx, "setting pool option", func() {
-		err = env.SetPoolOption(odbc.PoolOff)
+		err = c.odbcEnvironment.SetPoolOption(odbc.PoolOff)
 	})
 	if err != nil {
 		return
 	}
 
-	c.odbcEnvironment = env
+	c.initialized = true
 	return
 }
 
@@ -87,7 +94,7 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 	defer trace.End()
 
 	var err error
-	if err = c.initEnvironment(ctx); err != nil {
+	if err = c.initialize(ctx); err != nil {
 		return nil, err
 	}
 
