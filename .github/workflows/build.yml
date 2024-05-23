@@ -21,4 +21,6 @@ jobs:
       - name: Test
         env:
           GOPROXY: "https://proxy.golang.org"
-        run: go test -v .
+        run: |
+          go test -v ./ ./internal/cache -covermode=count -coverprofile=coverage.out
+          go tool cover -func=coverage.out -o=coverage.out

@@ -29,12 +29,6 @@ func (r *Rows) ColumnTypePrecisionScale(index int) (precision, scale int64, ok b
 
 }
 
-//// ColumnTypeDatabaseTypeName implements RowsColumnTypeDatabaseTypeName
-//func (r *Rows) ColumnTypeDatabaseTypeName(index int) string {
-//	col := r.odbcRecordset.Column(index)
-//	return col.TypeName
-//}
-
 // ColumnTypeScanType implements driver.RowsColumnTypeScanType
 func (r *Rows) ColumnTypeScanType(index int) reflect.Type {
 	return r.odbcRecordset.Column(index).ScanType()
@@ -93,4 +87,4 @@ func (r *Rows) Next(dest []driver.Value) error {
 	return errs.Error()
 }
 
-//TODO: is it possible to paginate with SQLExtendedFetch and the go sql driver
+//TODO(ninthclowd): is it possible to paginate with SQLExtendedFetch and the go sql driver

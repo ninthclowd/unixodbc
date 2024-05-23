@@ -39,6 +39,10 @@ func (l *LRU[T]) evictLRU() error {
 	return nil
 }
 
+func (l *LRU[T]) Capacity() int {
+	return l.capacity
+}
+
 func (l *LRU[T]) Put(key string, value *T) error {
 	if l.capacity == 0 {
 		if l.onEvict != nil {

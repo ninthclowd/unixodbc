@@ -16,17 +16,12 @@ type PreparedStatement struct {
 	odbcStatement odbc.Statement
 	query         string
 	conn          *Connection
-	rows          *Rows
 	numInput      int
 }
 
 // Close implements driver.Stmt
 func (s *PreparedStatement) Close() error {
 	errs := make(MultipleErrors)
-	if s.rows != nil { //TODO is this check needed? will the driver always close rows before the statement
-		errs["closing recordset"] = s.rows.Close()
-		s.rows = nil
-	}
 	errs["cache"] = s.conn.cachedStatements.Put(s.query, s)
 	return errs.Error()
 }

@@ -6,6 +6,8 @@ import (
 	"github.com/ninthclowd/unixodbc/internal/odbc"
 )
 
+const DefaultCacheSize = 0
+
 var driverInstance = &Driver{}
 
 func init() {
@@ -25,7 +27,7 @@ type Driver struct{}
 func (d *Driver) OpenConnector(connStr string) (driver.Connector, error) {
 	return &Connector{
 		ConnectionString:   StaticConnStr(connStr),
-		StatementCacheSize: 0,
+		StatementCacheSize: DefaultCacheSize,
 	}, nil
 }
 

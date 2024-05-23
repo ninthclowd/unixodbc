@@ -46,19 +46,20 @@ func (c *Connector) Close() error {
 }
 
 func (c *Connector) initEnvironment(ctx context.Context) (err error) {
-	if c.odbcEnvironment != nil {
-		return nil
-	}
-	var env odbc.Environment
+
+	env := c.odbcEnvironment
 
 	ctx, trace := Tracer.NewTask(ctx, "connection::initEnvironment")
 	defer trace.End()
 
-	Tracer.WithRegion(ctx, "initializing ODBC environment", func() {
-		env, err = odbc.NewEnvironment()
-	})
-	if err != nil {
-		return
+	if c.odbcEnvironment == nil {
+
+		Tracer.WithRegion(ctx, "initializing ODBC environment", func() {
+			env, err = odbc.NewEnvironment()
+		})
+		if err != nil {
+			return
+		}
 	}
 
 	Tracer.WithRegion(ctx, "setting version", func() {
@@ -75,10 +76,6 @@ func (c *Connector) initEnvironment(ctx context.Context) (err error) {
 	if err != nil {
 		return
 	}
-
-	//if err = env.SetTraceFile(c.TraceFile); err != nil {
-	//	return
-	//}
 
 	c.odbcEnvironment = env
 	return
@@ -107,10 +104,8 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 	}
 
 	conn := &Connection{
-		connector: c,
-		cachedStatements: cache.NewLRU[PreparedStatement](c.StatementCacheSize, func(key string, value *PreparedStatement) error {
-			return value.odbcStatement.Close()
-		}),
+		connector:        c,
+		cachedStatements: cache.NewLRU[PreparedStatement](c.StatementCacheSize, onCachePurged),
 	}
 
 	Tracer.WithRegion(ctx, "connecting", func() {
@@ -131,4 +126,8 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 // Driver implements driver.Connector
 func (c *Connector) Driver() driver.Driver {
 	return driverInstance
+}
+
+func onCachePurged(key string, value *PreparedStatement) error {
+	return value.odbcStatement.Close()
 }

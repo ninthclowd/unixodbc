@@ -18,7 +18,7 @@ func (m MultipleErrors) Error() error {
 	var combinedErrMsg string
 	for desc, err := range m {
 		if err != nil {
-			//TODO in go1.20 use errors.join and implement unwrap
+			//TODO(ninthclowd): use errors.join and implement unwrap
 			if combinedErrMsg == "" {
 				combinedErrMsg = fmt.Sprintf("%s: %s", desc, err.Error())
 			} else {
