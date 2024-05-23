@@ -7,11 +7,15 @@ build:
 fmt:
 	go fmt ./...
 
-test: test-mariadb test-postgres test-mssql
+test: test-go test-mariadb test-postgres test-mssql
+
+test-go:
+	go test ./ ./internal/cache -covermode=count -coverprofile=coverage.out
+	go tool cover -func=coverage.out -o=coverage.out
+
 
 test-mariadb:
 	docker compose run --rm mariadb_test
-	go tool cover -html test/acceptance/mariadb/coverage.out -o test/acceptance/mariadb/coverage.html
 
 test-postgres:
 	docker compose run --rm postgres_test

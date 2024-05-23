@@ -7,10 +7,6 @@ import (
 
 var (
 	ErrNotImplemented = errors.New("not implemented")
-	// ErrHandledAllocated = errors.New("handle previously allocated")
-
-	// ErrHandleFreed      = errors.New("attempt to double free")
-	//ErrConnectionDead   = errors.New("Connection dead")
 )
 
 type ErrorMap map[string]error

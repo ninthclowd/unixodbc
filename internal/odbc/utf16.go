@@ -1,5 +1,6 @@
 package odbc
 
+import "C"
 import (
 	"database/sql/driver"
 	"encoding/binary"
@@ -17,12 +18,12 @@ func init() {
 	)
 }
 
-func newUTF16Column(info *columnInfo, hnd handle) Column {
+func newUTF16Column(info *columnInfo, hnd *handle) Column {
 	return &columnUTF16{hnd, info}
 }
 
 type columnUTF16 struct {
-	handle
+	*handle
 	*columnInfo
 }
 
@@ -38,11 +39,17 @@ func (c *columnUTF16) Decimal() (precision int64, scale int64, ok bool) {
 	return
 }
 
+//go:nocheckptr
 func (c *columnUTF16) Value() (driver.Value, error) {
 	utfLength := c.columnSize * 2
 	value := make([]byte, utfLength+1)
 	var valueLength api.SQLLEN
-	if _, err := c.result(c.api().SQLGetData(api.SQLHSTMT(c.hnd()), c.columnNumber, api.SQL_C_WCHAR, api.SQLPOINTER(&value[0]), api.SQLLEN(len(value)), &valueLength)); err != nil {
+	if _, err := c.result(api.SQLGetData((*api.SQLHSTMT)(c.hnd()),
+		c.columnNumber,
+		api.SQL_C_WCHAR,
+		(*api.SQLPOINTER)(unsafe.Pointer(&value[0])),
+		api.SQLLEN(len(value)),
+		&valueLength)); err != nil {
 		return nil, err
 	}
 	if valueLength == api.SQL_NULL_DATA {
@@ -53,7 +60,8 @@ func (c *columnUTF16) Value() (driver.Value, error) {
 	return str, nil
 }
 
-func (s *Statement) bindUTF16(index int, src string) error {
+//go:nocheckptr
+func (s *statement) bindUTF16(index int, src string) error {
 	nts := make([]rune, len(src)+1)
 	for i, r := range src {
 		nts[i] = r
@@ -61,11 +69,16 @@ func (s *Statement) bindUTF16(index int, src string) error {
 	val := utf16.Encode(nts)
 
 	sz := unsafe.Sizeof(val)
-	_, err := s.result(s.api().SQLBindParameter((api.SQLHSTMT)(s.hnd()), api.SQLUSMALLINT(index+1), api.SQL_PARAM_INPUT,
-		api.SQL_C_WCHAR, api.SQLSMALLINT(api.SQL_WVARCHAR),
-		api.SQLULEN(sz), 0,
-		api.SQLPOINTER(&val[0]),
-		0, nil))
+	_, err := s.result(api.SQLBindParameter((*api.SQLHSTMT)(s.hnd()),
+		api.SQLUSMALLINT(index+1),
+		api.SQL_PARAM_INPUT,
+		api.SQL_C_WCHAR,
+		api.SQLSMALLINT(api.SQL_WVARCHAR),
+		api.SQLULEN(sz),
+		0,
+		(*api.SQLPOINTER)(unsafe.Pointer(&val[0])),
+		0,
+		nil))
 	return err
 }
 

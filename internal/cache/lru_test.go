@@ -42,7 +42,7 @@ func TestLRU_Put_Empty_Eviction(t *testing.T) {
 
 	lru := cache.NewLRU[MyStruct](0, onEvict)
 
-	if gotErr := lru.Put("A", &wantValue); gotErr != wantErr {
+	if gotErr := lru.Put("A", &wantValue); !errors.Is(gotErr, wantErr) {
 		t.Fatalf("expected error %v but received: %v", wantErr, gotErr)
 	}
 }
@@ -68,7 +68,7 @@ func TestLRU_Put_Evict_Error(t *testing.T) {
 		t.Fatalf("expected no error but received: %v", gotErr)
 	}
 
-	if gotErr := lru.Put("B", new(MyStruct)); gotErr != wantErr {
+	if gotErr := lru.Put("B", new(MyStruct)); !errors.Is(gotErr, wantErr) {
 		t.Fatalf("expected error %v but received %v", wantErr, gotErr)
 	}
 }
@@ -126,7 +126,7 @@ func TestLRU_Purge_Error(t *testing.T) {
 		t.Fatalf("expected no error but received: %v", gotErr)
 	}
 
-	if gotErr := lru.Purge(); gotErr != wantErr {
+	if gotErr := lru.Purge(); !errors.Is(gotErr, wantErr) {
 		t.Fatalf("expected %v but received %v", wantErr, gotErr)
 	}
 }

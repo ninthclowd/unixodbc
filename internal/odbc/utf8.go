@@ -4,6 +4,7 @@ import (
 	"database/sql/driver"
 	"github.com/ninthclowd/unixodbc/internal/api"
 	"reflect"
+	"unsafe"
 )
 
 func init() {
@@ -14,12 +15,12 @@ func init() {
 	)
 }
 
-func newUTF8Column(info *columnInfo, hnd handle) Column {
+func newUTF8Column(info *columnInfo, hnd *handle) Column {
 	return &columnUTF8{hnd, info}
 }
 
 type columnUTF8 struct {
-	handle
+	*handle
 	*columnInfo
 }
 
@@ -35,10 +36,16 @@ func (c *columnUTF8) Decimal() (precision int64, scale int64, ok bool) {
 	return
 }
 
+//go:nocheckptr
 func (c *columnUTF8) Value() (driver.Value, error) {
-	value := make([]byte, c.columnSize+1)
+	value := make([]uint8, c.columnSize+1)
 	var valueLength api.SQLLEN
-	if _, err := c.result(c.api().SQLGetData(api.SQLHSTMT(c.hnd()), c.columnNumber, api.SQL_C_CHAR, api.SQLPOINTER(&value[0]), api.SQLLEN(len(value)), &valueLength)); err != nil {
+	if _, err := c.result(api.SQLGetData((*api.SQLHSTMT)(c.hnd()),
+		c.columnNumber,
+		api.SQL_C_CHAR,
+		(*api.SQLPOINTER)(unsafe.Pointer(&value[0])),
+		api.SQLLEN(len(value)),
+		&valueLength)); err != nil {
 		return nil, err
 	}
 	if valueLength == api.SQL_NULL_DATA {

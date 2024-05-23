@@ -19,8 +19,8 @@ var _ driver.RowsColumnTypePrecisionScale = (*Rows)(nil)
 
 type Rows struct {
 	ctx                context.Context
-	odbcRecordset      *odbc.RecordSet
-	closeStmtOnRSClose *odbc.Statement
+	odbcRecordset      odbc.RecordSet
+	closeStmtOnRSClose odbc.Statement
 }
 
 // ColumnTypePrecisionScale implements driver.RowsColumnTypePrecisionScale
@@ -28,12 +28,6 @@ func (r *Rows) ColumnTypePrecisionScale(index int) (precision, scale int64, ok b
 	return r.odbcRecordset.Column(index).Decimal()
 
 }
-
-//// ColumnTypeDatabaseTypeName implements RowsColumnTypeDatabaseTypeName
-//func (r *Rows) ColumnTypeDatabaseTypeName(index int) string {
-//	col := r.odbcRecordset.Column(index)
-//	return col.TypeName
-//}
 
 // ColumnTypeScanType implements driver.RowsColumnTypeScanType
 func (r *Rows) ColumnTypeScanType(index int) reflect.Type {
@@ -84,7 +78,7 @@ func (r *Rows) Next(dest []driver.Value) error {
 	}
 
 	errs := make(MultipleErrors)
-	for i, _ := range dest {
+	for i := range dest {
 		col := r.odbcRecordset.Column(i)
 		Tracer.WithRegion(r.ctx, "Scanning column "+col.Name(), func() {
 			dest[i], errs[col.Name()] = col.Value()
@@ -93,4 +87,4 @@ func (r *Rows) Next(dest []driver.Value) error {
 	return errs.Error()
 }
 
-//TODO: is it possible to paginate with SQLExtendedFetch and the go sql driver
+//TODO(ninthclowd): is it possible to paginate with SQLExtendedFetch and the go sql driver

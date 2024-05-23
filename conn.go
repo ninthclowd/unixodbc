@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"errors"
 	"fmt"
 	"github.com/ninthclowd/unixodbc/internal/cache"
 	"github.com/ninthclowd/unixodbc/internal/odbc"
@@ -18,7 +19,6 @@ var (
 	_ driver.Pinger             = (*Connection)(nil)
 	_ driver.Conn               = (*Connection)(nil)
 	_ driver.NamedValueChecker  = (*Connection)(nil)
-	_ driver.SessionResetter    = (*Connection)(nil)
 	_ driver.Validator          = (*Connection)(nil)
 )
 
@@ -31,7 +31,7 @@ var toODBCIsoLvl = map[sql.IsolationLevel]odbc.IsolationLevel{
 
 type Connection struct {
 	connector        *Connector
-	odbcConnection   *odbc.Connection
+	odbcConnection   odbc.Connection
 	openTX           *TX
 	cachedStatements *cache.LRU[PreparedStatement]
 }
@@ -43,12 +43,6 @@ func (c *Connection) IsValid() bool {
 	}
 	//TODO return false on cancelled queries?
 	return true
-}
-
-// ResetSession implements driver.SessionResetter
-func (c *Connection) ResetSession(ctx context.Context) error {
-	//TODO implement me
-	return nil
 }
 
 // CheckNamedValue implements driver.NamedValueChecker
@@ -131,7 +125,7 @@ func (c *Connection) Prepare(query string) (driver.Stmt, error) {
 
 // PrepareContext implements driver.ConnPrepareContext
 func (c *Connection) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
-	ctx, trace := Tracer.NewTask(ctx, "Connection::PrepareContext")
+	ctx, trace := Tracer.NewTask(ctx, "connection::PrepareContext")
 	defer trace.End()
 	Tracer.Logf(ctx, "query", query)
 
@@ -152,7 +146,7 @@ func (c *Connection) PrepareContext(ctx context.Context, query string) (driver.S
 		return stmt, nil
 	}
 
-	var st *odbc.Statement
+	var st odbc.Statement
 	Tracer.WithRegion(ctx, "Create statement", func() {
 		st, err = c.odbcConnection.Statement()
 	})
@@ -186,10 +180,10 @@ func (c *Connection) PrepareContext(ctx context.Context, query string) (driver.S
 
 // ExecContext implements driver.ExecerContext
 func (c *Connection) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
-	ctx, trace := Tracer.NewTask(ctx, "Connection::ExecContext")
+	ctx, trace := Tracer.NewTask(ctx, "connection::ExecContext")
 	defer trace.End()
 	Tracer.Logf(ctx, "query", query)
-	var st *odbc.Statement
+	var st odbc.Statement
 	var err error
 
 	Tracer.WithRegion(ctx, "Create statement", func() {
@@ -200,7 +194,7 @@ func (c *Connection) ExecContext(ctx context.Context, query string, args []drive
 	}
 	defer func() {
 		Tracer.WithRegion(ctx, "Close statement", func() {
-			st.Close()
+			_ = st.Close()
 		})
 	}()
 	Tracer.WithRegion(ctx, "Bind parameters", func() {
@@ -220,11 +214,11 @@ func (c *Connection) ExecContext(ctx context.Context, query string, args []drive
 
 // QueryContext implements driver.QueryerContext
 func (c *Connection) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
-	ctx, trace := Tracer.NewTask(ctx, "Connection::QueryContext")
+	ctx, trace := Tracer.NewTask(ctx, "connection::QueryContext")
 	defer trace.End()
 	Tracer.Logf(ctx, "query", query)
 
-	var st *odbc.Statement
+	var st odbc.Statement
 	var err error
 
 	Tracer.WithRegion(ctx, "Create statement", func() {
@@ -249,7 +243,7 @@ func (c *Connection) QueryContext(ctx context.Context, query string, args []driv
 		_ = st.Close()
 		return nil, err
 	}
-	var rs *odbc.RecordSet
+	var rs odbc.RecordSet
 	Tracer.WithRegion(ctx, "Getting recordset", func() {
 		rs, err = st.RecordSet()
 	})
@@ -263,18 +257,17 @@ func (c *Connection) QueryContext(ctx context.Context, query string, args []driv
 
 // Ping implements driver.Pinger
 func (c *Connection) Ping(ctx context.Context) error {
-	ctx, trace := Tracer.NewTask(ctx, "Connection::Ping")
+	ctx, trace := Tracer.NewTask(ctx, "connection::Ping")
 	defer trace.End()
 	if c.odbcConnection == nil {
 		return driver.ErrBadConn
 	}
-	switch err := c.odbcConnection.Ping(); err {
-	case odbc.ErrConnectionDead:
+	switch err := c.odbcConnection.Ping(); {
+	case errors.Is(err, odbc.ErrConnectionDead):
 		return driver.ErrBadConn
 	default:
 		return err
 	}
-	return nil
 }
 
 func toValues(args []driver.NamedValue) (values []interface{}) {
