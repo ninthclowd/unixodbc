@@ -1,6 +1,7 @@
 package unixodbc
 
 import (
+	"context"
 	"database/sql"
 	"github.com/ninthclowd/unixodbc/internal/odbc"
 	"testing"
@@ -36,7 +37,7 @@ func TestDriver_OpenConnector(t *testing.T) {
 	if !ok {
 		t.Fatalf("incorrect connector, got %v", db)
 	}
-	if connStr, _ := connector.ConnectionString.ConnectionString(); connStr != "MyDSN" {
+	if connStr, _ := connector.ConnectionString.ConnectionString(context.Background()); connStr != "MyDSN" {
 		t.Errorf("incorrect connection string, got %v", connStr)
 	}
 	if connector.StatementCacheSize != DefaultCacheSize {

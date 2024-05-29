@@ -95,6 +95,7 @@ and connecting with [sql.OpenDB](https://pkg.go.dev/database/sql#OpenDB):
 package main
 
 import (
+	"context"
 	"github.com/ninthclowd/unixodbc"
 	"database/sql"
 )
@@ -103,7 +104,7 @@ type GetToken struct {
 }
 
 // ConnectionString implements unixodbc.ConnectionStringFactory
-func (d *GetToken) ConnectionString() (connStr string, err error) {
+func (d *GetToken) ConnectionString(ctx context.Context) (connStr string, err error) {
 	var token string
 	// insert code to pull token for each new connection
 	// ...

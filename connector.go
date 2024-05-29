@@ -13,14 +13,14 @@ import (
 // StaticConnStr converts a static connection string into ConnectionStringFactory usable by Connector
 type StaticConnStr string
 
-func (s StaticConnStr) ConnectionString() (string, error) {
+func (s StaticConnStr) ConnectionString(ctx context.Context) (string, error) {
 	return string(s), nil
 }
 
 // ConnectionStringFactory can be implemented to provide dynamic connection strings for each new connection to the
 // database, allowing for connections to systems that require token based authentication
 type ConnectionStringFactory interface {
-	ConnectionString() (string, error)
+	ConnectionString(ctx context.Context) (string, error)
 }
 
 var _ driver.Connector = (*Connector)(nil)
@@ -104,7 +104,7 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 
 	var connStr string
 	Tracer.WithRegion(ctx, "generating connection string", func() {
-		connStr, err = c.ConnectionString.ConnectionString()
+		connStr, err = c.ConnectionString.ConnectionString(ctx)
 	})
 	if err != nil {
 		return nil, err
