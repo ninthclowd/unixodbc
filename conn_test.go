@@ -49,8 +49,9 @@ func testConnection(t *testing.T) (ctrl *gomock.Controller, conn *Connection, mo
 
 	mockConn = mocks.NewMockConnection(ctrl)
 	conn = &Connection{
-		odbcConnection:   mockConn,
-		cachedStatements: cache.NewLRU[PreparedStatement](1, onCachePurged),
+		odbcConnection:     mockConn,
+		cachedStatements:   cache.NewLRU[PreparedStatement](1, onCachePurged),
+		uncachedStatements: map[*PreparedStatement]bool{},
 	}
 	return
 }

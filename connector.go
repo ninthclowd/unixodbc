@@ -111,8 +111,9 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 	}
 
 	conn := &Connection{
-		connector:        c,
-		cachedStatements: cache.NewLRU[PreparedStatement](c.StatementCacheSize, onCachePurged),
+		connector:          c,
+		cachedStatements:   cache.NewLRU[PreparedStatement](c.StatementCacheSize, onCachePurged),
+		uncachedStatements: make(map[*PreparedStatement]bool),
 	}
 
 	Tracer.WithRegion(ctx, "connecting", func() {
