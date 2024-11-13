@@ -23,8 +23,7 @@ type PreparedStatement struct {
 func (s *PreparedStatement) Close() error {
 	delete(s.conn.uncachedStatements, s)
 	//move the statement to the LRU, closing the statement if no room in cache
-	err := s.conn.cachedStatements.Put(s.query, s)
-	return err
+	return s.conn.cachedStatements.Put(s.query, s)
 }
 
 // NumInput implements driver.Stmt

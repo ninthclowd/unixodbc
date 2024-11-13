@@ -47,9 +47,19 @@ func (c *Connection) IsValid() bool {
 	return true
 }
 
+func (c *Connection) closeOpenStatements() error {
+	//close any uncached statements the client forgot to close
+	for ps, _ := range c.uncachedStatements {
+		if err := ps.Close(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // ResetSession implements driver.SessionResetter
 func (c *Connection) ResetSession(ctx context.Context) error {
-	return nil
+	return c.closeOpenStatements()
 }
 
 // CheckNamedValue implements driver.NamedValueChecker
@@ -65,14 +75,11 @@ func (c *Connection) CheckNamedValue(value *driver.NamedValue) error {
 // Close implements driver.Conn
 func (c *Connection) Close() error {
 	//close all cached open statements
-	if err := c.cachedStatements.Purge(); err != nil {
+	if err := c.closeOpenStatements(); err != nil {
 		return err
 	}
-	//close any uncached statements the client forgot to close
-	for ps, _ := range c.uncachedStatements {
-		if err := ps.Close(); err != nil {
-			return err
-		}
+	if err := c.cachedStatements.Purge(); err != nil {
+		return err
 	}
 	if err := c.odbcConnection.Close(); err != nil {
 		return err
@@ -151,6 +158,7 @@ func (c *Connection) PrepareContext(ctx context.Context, query string) (driver.S
 	})
 
 	if stmt != nil {
+		c.uncachedStatements[stmt] = true
 		Tracer.WithRegion(ctx, "Reset parameters", func() {
 			err = stmt.odbcStatement.ResetParams()
 		})
