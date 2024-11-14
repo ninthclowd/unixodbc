@@ -19,9 +19,23 @@ type PreparedStatement struct {
 	numInput      int
 }
 
+func (s *PreparedStatement) closeWithError(err error) error {
+	if s.odbcStatement != nil {
+		closeErr := s.odbcStatement.Close()
+		s.odbcStatement = nil
+		if closeErr != nil {
+			return closeErr
+		}
+	}
+	return err
+}
+
 // Close implements driver.Stmt
 func (s *PreparedStatement) Close() error {
 	delete(s.conn.uncachedStatements, s)
+	if s.odbcStatement == nil {
+		return nil
+	}
 	//move the statement to the LRU, closing the statement if no room in cache
 	return s.conn.cachedStatements.Put(s.query, s)
 }
@@ -38,6 +52,9 @@ func (s *PreparedStatement) Exec(args []driver.Value) (driver.Result, error) {
 
 // ExecContext implements driver.StmtExecContext
 func (s *PreparedStatement) ExecContext(ctx context.Context, args []driver.NamedValue) (driver.Result, error) {
+	if s.odbcStatement == nil {
+		return nil, odbc.ErrInvalidHandle
+	}
 	ctx, trace := Tracer.NewTask(ctx, "statement::ExecContext")
 	defer trace.End()
 	var err error
@@ -45,13 +62,13 @@ func (s *PreparedStatement) ExecContext(ctx context.Context, args []driver.Named
 		err = s.odbcStatement.BindParams(toValues(args)...)
 	})
 	if err != nil {
-		return nil, err
+		return nil, s.closeWithError(err)
 	}
 	Tracer.WithRegion(ctx, "Execute", func() {
 		err = s.odbcStatement.Execute(ctx)
 	})
 	if err != nil {
-		return nil, err
+		return nil, s.closeWithError(err)
 	}
 	return &result{lastInsertId: 0, rowsAffected: 0}, nil //TODO stats for exec
 }
@@ -63,6 +80,9 @@ func (s *PreparedStatement) Query(args []driver.Value) (driver.Rows, error) {
 
 // QueryContext implements driver.StmtQueryContext
 func (s *PreparedStatement) QueryContext(ctx context.Context, args []driver.NamedValue) (driver.Rows, error) {
+	if s.odbcStatement == nil {
+		return nil, odbc.ErrInvalidHandle
+	}
 	ctx, trace := Tracer.NewTask(ctx, "statement::QueryContext")
 	defer trace.End()
 	var err error
@@ -70,21 +90,21 @@ func (s *PreparedStatement) QueryContext(ctx context.Context, args []driver.Name
 		err = s.odbcStatement.BindParams(toValues(args)...)
 	})
 	if err != nil {
-		return nil, err
+		return nil, s.closeWithError(err)
 	}
 	Tracer.WithRegion(ctx, "Execute", func() {
 		err = s.odbcStatement.Execute(ctx)
 	})
 	if err != nil {
-		return nil, err
+		return nil, s.closeWithError(err)
 	}
 
 	var rs odbc.RecordSet
-	Tracer.WithRegion(ctx, "recordSet", func() {
+	Tracer.WithRegion(ctx, "RecordSet", func() {
 		rs, err = s.odbcStatement.RecordSet()
 	})
 	if err != nil {
-		return nil, err
+		return nil, s.closeWithError(err)
 	}
 	return &Rows{odbcRecordset: rs, ctx: ctx}, nil
 }

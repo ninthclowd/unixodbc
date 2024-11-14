@@ -137,5 +137,5 @@ func (c *Connector) Driver() driver.Driver {
 }
 
 func onCachePurged(key string, value *PreparedStatement) error {
-	return value.odbcStatement.Close()
+	return value.closeWithError(nil)
 }
