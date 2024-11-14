@@ -135,6 +135,74 @@ func TestValidateSleep(t *testing.T) {
 	}
 }
 
+func TestConnection_Prepare_Query_Close_Cleanup(t *testing.T) {
+	_, conn, ctx, finish := newTestConnection(t)
+	defer finish()
+
+	stmt, err := conn.PrepareContext(ctx, "SELECT 1")
+	if err != nil {
+		t.Fatalf("expected no error preparing stmt but received one: %s", err.Error())
+	}
+	rows, err := stmt.QueryContext(ctx)
+	if err != nil {
+		t.Fatalf("expected no error but received one: %s", err.Error())
+	}
+	if !rows.Next() {
+		t.Errorf("expected a row after cancelled: %s", rows.Err())
+	}
+
+	conn.Close()
+
+}
+
+func TestConnection_Query_Close_Cleanup(t *testing.T) {
+	_, conn, ctx, finish := newTestConnection(t)
+	defer finish()
+
+	rows, err := conn.QueryContext(ctx, "SELECT 1")
+
+	if err != nil {
+		t.Fatalf("expected no error but received one: %s", err.Error())
+	}
+	if !rows.Next() {
+		t.Errorf("expected a row after cancelled: %s", rows.Err())
+	}
+
+	conn.Close()
+
+}
+
+func TestConnection_Exec_Close_Cleanup(t *testing.T) {
+	_, conn, ctx, finish := newTestConnection(t)
+	defer finish()
+
+	_, err := conn.ExecContext(ctx, "SELECT 1")
+
+	if err != nil {
+		t.Fatalf("expected no error but received one: %s", err.Error())
+	}
+
+	conn.Close()
+
+}
+
+func TestConnection_Prepare_Exec_Close_Cleanup(t *testing.T) {
+	_, conn, ctx, finish := newTestConnection(t)
+	defer finish()
+
+	stmt, err := conn.PrepareContext(ctx, "SELECT 1")
+	if err != nil {
+		t.Fatalf("expected no error preparing stmt but received one: %s", err.Error())
+	}
+	_, err = stmt.ExecContext(ctx)
+	if err != nil {
+		t.Fatalf("expected no error but received one: %s", err.Error())
+	}
+
+	conn.Close()
+
+}
+
 func TestConnection_ExecContext_Cancel(t *testing.T) {
 	_, conn, ctx, finish := newTestConnection(t)
 	defer finish()
@@ -180,4 +248,51 @@ func TestConnection_QueryContext_Cancel(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected no error from subsequent query, got: %s", err.Error())
 	}
+}
+
+func TestConnection_Prepare_QueryContext_Cancel(t *testing.T) {
+	_, conn, ctx, finish := newTestConnection(t)
+	defer finish()
+
+	stmt, err := conn.PrepareContext(ctx, "SELECT pg_sleep(2)")
+
+	execCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
+	start := time.Now()
+	_, err = stmt.QueryContext(execCtx)
+	elapsed := time.Since(start)
+	if elapsed.Seconds() > 1 {
+		t.Errorf("query did not return immediately when cancelled")
+	}
+	if err == nil || !strings.Contains(err.Error(), "[57014:1]") {
+		t.Errorf("expected a cancellation error, got: %v", err)
+	}
+	cancel()
+
+	rows, err := stmt.QueryContext(ctx)
+	if err != nil {
+		t.Errorf("expected no error from subsequent query, got: %s", err.Error())
+	}
+	if !rows.Next() {
+		t.Errorf("expected a row got none")
+	}
+}
+
+func TestConnection_Prepare_ExecContext_Cancel(t *testing.T) {
+	_, conn, ctx, finish := newTestConnection(t)
+	defer finish()
+
+	stmt, err := conn.PrepareContext(ctx, "SELECT pg_sleep(2)")
+
+	execCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
+	start := time.Now()
+	_, err = stmt.ExecContext(execCtx)
+	elapsed := time.Since(start)
+	if elapsed.Seconds() > 1 {
+		t.Errorf("query did not return immediately when cancelled")
+	}
+	if err == nil || !strings.Contains(err.Error(), "[57014:1]") {
+		t.Errorf("expected a cancellation error, got: %v", err)
+	}
+	cancel()
+
 }

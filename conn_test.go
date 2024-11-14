@@ -44,19 +44,20 @@ func testDBConnection(t *testing.T, cacheSize int) (ctrl *gomock.Controller, con
 	return
 }
 
-func testConnection(t *testing.T) (ctrl *gomock.Controller, conn *Connection, mockConn *mocks.MockConnection) {
+func testConnection(t *testing.T, cacheSize int) (ctrl *gomock.Controller, conn *Connection, mockConn *mocks.MockConnection) {
 	ctrl = gomock.NewController(t)
 
 	mockConn = mocks.NewMockConnection(ctrl)
 	conn = &Connection{
-		odbcConnection:   mockConn,
-		cachedStatements: cache.NewLRU[PreparedStatement](1, onCachePurged),
+		odbcConnection:     mockConn,
+		cachedStatements:   cache.NewLRU[PreparedStatement](cacheSize, onCachePurged),
+		uncachedStatements: map[*PreparedStatement]bool{},
 	}
 	return
 }
 
 func TestConnection_IsValid(t *testing.T) {
-	ctrl, conn, mockConn := testConnection(t)
+	ctrl, conn, mockConn := testConnection(t, 1)
 	defer ctrl.Finish()
 
 	mockConn.EXPECT().Ping().Return(nil).Times(1)
@@ -103,7 +104,7 @@ func TestConnection_Ping(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.Description, func(t *testing.T) {
-			ctrl, conn, mockConn := testConnection(t)
+			ctrl, conn, mockConn := testConnection(t, 1)
 			defer ctrl.Finish()
 
 			mockConn.EXPECT().Ping().Return(test.PingError).AnyTimes()
@@ -183,7 +184,7 @@ func TestConnection_CheckNamedValue(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.Description, func(t *testing.T) {
-			ctrl, conn, _ := testConnection(t)
+			ctrl, conn, _ := testConnection(t, 1)
 			defer ctrl.Finish()
 
 			gotErr := conn.CheckNamedValue(&driver.NamedValue{
@@ -207,7 +208,7 @@ func TestConnection_CheckNamedValue(t *testing.T) {
 
 func TestConnection_Close(t *testing.T) {
 
-	ctrl, conn, mockConn := testConnection(t)
+	ctrl, conn, mockConn := testConnection(t, 1)
 	defer ctrl.Finish()
 
 	mockConn.EXPECT().Close().Return(nil).Times(1)
@@ -223,7 +224,7 @@ func TestConnection_Close(t *testing.T) {
 }
 
 func TestConnection_BeginTx(t *testing.T) {
-	ctrl, conn, mockConn := testConnection(t)
+	ctrl, conn, mockConn := testConnection(t, 1)
 	defer ctrl.Finish()
 
 	mockConn.EXPECT().SetIsolationLevel(odbc.LevelReadCommitted).Return(nil).Times(1)
@@ -250,7 +251,7 @@ func TestConnection_BeginTx(t *testing.T) {
 }
 
 func TestConnection_PrepareContext(t *testing.T) {
-	ctrl, conn, mockConn := testConnection(t)
+	ctrl, conn, mockConn := testConnection(t, 1)
 	defer ctrl.Finish()
 
 	q := "SELECT * FROM foo WHERE bar = ?"
@@ -317,8 +318,6 @@ func TestConnection_PrepareContext(t *testing.T) {
 
 	}
 
-	stmt3.Close()
-
 	//first statement should be evicted from cache when the next statement is created
 	mockStmt2.EXPECT().Close().Return(nil).Times(1)
 
@@ -329,7 +328,7 @@ func TestConnection_PrepareContext(t *testing.T) {
 }
 
 func TestConnection_ExecContext(t *testing.T) {
-	ctrl, conn, mockConn := testConnection(t)
+	ctrl, conn, mockConn := testConnection(t, 1)
 	defer ctrl.Finish()
 
 	q := "SELECT * FROM foo WHERE bar = ?"
@@ -353,7 +352,7 @@ func TestConnection_ExecContext(t *testing.T) {
 }
 
 func TestConnection_QueryContext(t *testing.T) {
-	ctrl, conn, mockConn := testConnection(t)
+	ctrl, conn, mockConn := testConnection(t, 1)
 	defer ctrl.Finish()
 
 	q := "SELECT * FROM foo WHERE bar = ?"
@@ -386,5 +385,180 @@ func TestConnection_QueryContext(t *testing.T) {
 	if r.odbcRecordset != mockRS {
 		t.Errorf("recordset not populated on Rows. got %v", gotRows)
 	}
+
+}
+
+func TestConnection_Close_Cache(t *testing.T) {
+	ctrl, conn, mockConn := testConnection(t, 1)
+	defer ctrl.Finish()
+
+	q := "SELECT * FROM foo WHERE bar = ?"
+
+	ctx := context.Background()
+	mockStmt1 := mocks.NewMockStatement(ctrl)
+
+	mockStmt1.EXPECT().Prepare(gomock.Any(), q).Return(nil).Times(1)
+	mockStmt1.EXPECT().NumParams().Return(1, nil).Times(1)
+	mockConn.EXPECT().Statement().Return(mockStmt1, nil).Times(1)
+
+	stmt1, err := conn.PrepareContext(ctx, q)
+	if err != nil {
+		t.Fatalf("expected no error from prepareContext but got %v", err)
+	}
+	ps, ok := stmt1.(*PreparedStatement)
+	if !ok {
+		t.Fatalf("expected a statement to be returnedbut got %v", err)
+	}
+	if ps.odbcStatement != mockStmt1 {
+		t.Errorf("expected statement to be %v but got %v", mockStmt1, ps.odbcStatement)
+
+	}
+	if gotNumInput := ps.NumInput(); gotNumInput != 1 {
+		t.Errorf("expected num input to be %v but got %v", 1, gotNumInput)
+	}
+
+	//statement should be closed when the connection is closed
+	mockStmt1.EXPECT().Close().Return(nil).Times(1)
+
+	mockConn.EXPECT().Close().Return(nil).Times(1)
+
+	conn.Close()
+
+}
+
+func TestConnection_Close_No_Cache(t *testing.T) {
+	ctrl, conn, mockConn := testConnection(t, 0)
+	defer ctrl.Finish()
+
+	q := "SELECT * FROM foo WHERE bar = ?"
+
+	ctx := context.Background()
+	mockStmt1 := mocks.NewMockStatement(ctrl)
+
+	mockStmt1.EXPECT().Prepare(gomock.Any(), q).Return(nil).Times(1)
+	mockStmt1.EXPECT().NumParams().Return(1, nil).Times(1)
+	mockConn.EXPECT().Statement().Return(mockStmt1, nil).Times(1)
+
+	stmt1, err := conn.PrepareContext(ctx, q)
+	if err != nil {
+		t.Fatalf("expected no error from prepareContext but got %v", err)
+	}
+	ps, ok := stmt1.(*PreparedStatement)
+	if !ok {
+		t.Fatalf("expected a statement to be returnedbut got %v", err)
+	}
+	if ps.odbcStatement != mockStmt1 {
+		t.Errorf("expected statement to be %v but got %v", mockStmt1, ps.odbcStatement)
+
+	}
+	if gotNumInput := ps.NumInput(); gotNumInput != 1 {
+		t.Errorf("expected num input to be %v but got %v", 1, gotNumInput)
+	}
+
+	//statement should be closed when the connection is closed
+	mockStmt1.EXPECT().Close().Return(nil).Times(1)
+
+	mockConn.EXPECT().Close().Return(nil).Times(1)
+
+	conn.Close()
+
+}
+
+func TestConnection_ResetSession_Cache(t *testing.T) {
+	ctrl, conn, mockConn := testConnection(t, 1)
+	defer ctrl.Finish()
+
+	q := "SELECT * FROM foo WHERE bar = ?"
+
+	ctx := context.Background()
+	mockStmt1 := mocks.NewMockStatement(ctrl)
+
+	mockStmt1.EXPECT().Prepare(gomock.Any(), q).Return(nil).Times(1)
+	mockStmt1.EXPECT().NumParams().Return(1, nil).Times(1)
+	mockConn.EXPECT().Statement().Return(mockStmt1, nil).Times(1)
+
+	stmt1, err := conn.PrepareContext(ctx, q)
+	if err != nil {
+		t.Fatalf("expected no error from prepareContext but got %v", err)
+	}
+	ps, ok := stmt1.(*PreparedStatement)
+	if !ok {
+		t.Fatalf("expected a statement to be returnedbut got %v", err)
+	}
+	if ps.odbcStatement != mockStmt1 {
+		t.Errorf("expected statement to be %v but got %v", mockStmt1, ps.odbcStatement)
+
+	}
+	if gotNumInput := ps.NumInput(); gotNumInput != 1 {
+		t.Errorf("expected num input to be %v but got %v", 1, gotNumInput)
+	}
+
+	err = conn.ResetSession(ctx)
+	if err != nil {
+		t.Fatalf("expected no error from ResetSession but got %v", err)
+	}
+
+	mockStmt1.EXPECT().ResetParams().Times(1)
+
+	stmt2, err := conn.PrepareContext(ctx, q)
+	if err != nil {
+		t.Fatalf("expected no error from prepareContext but got %v", err)
+	}
+	ps2, ok := stmt2.(*PreparedStatement)
+	if !ok {
+		t.Fatalf("expected a statement to be returned but got %v", err)
+	}
+	if ps2.odbcStatement != mockStmt1 {
+		t.Error("expected returned statement to be cached after resetting the session")
+
+	}
+
+	//statement should be closed when the connection is closed
+	mockStmt1.EXPECT().Close().Return(nil).Times(1)
+	mockConn.EXPECT().Close().Return(nil).Times(1)
+
+	conn.Close()
+}
+
+func TestConnection_ResetSession_No_Cache(t *testing.T) {
+	ctrl, conn, mockConn := testConnection(t, 0)
+	defer ctrl.Finish()
+
+	q := "SELECT * FROM foo WHERE bar = ?"
+
+	ctx := context.Background()
+	mockStmt1 := mocks.NewMockStatement(ctrl)
+
+	mockStmt1.EXPECT().Prepare(gomock.Any(), q).Return(nil).Times(1)
+	mockStmt1.EXPECT().NumParams().Return(1, nil).Times(1)
+	mockConn.EXPECT().Statement().Return(mockStmt1, nil).Times(1)
+
+	stmt1, err := conn.PrepareContext(ctx, q)
+	if err != nil {
+		t.Fatalf("expected no error from prepareContext but got %v", err)
+	}
+	ps, ok := stmt1.(*PreparedStatement)
+	if !ok {
+		t.Fatalf("expected a statement to be returnedbut got %v", err)
+	}
+	if ps.odbcStatement != mockStmt1 {
+		t.Errorf("expected statement to be %v but got %v", mockStmt1, ps.odbcStatement)
+
+	}
+	if gotNumInput := ps.NumInput(); gotNumInput != 1 {
+		t.Errorf("expected num input to be %v but got %v", 1, gotNumInput)
+	}
+
+	//statement should be closed when the session is reset if there is no cache
+	mockStmt1.EXPECT().Close().Return(nil).Times(1)
+
+	err = conn.ResetSession(ctx)
+	if err != nil {
+		t.Fatalf("expected no error from ResetSession but got %v", err)
+	}
+
+	mockConn.EXPECT().Close().Return(nil).Times(1)
+
+	conn.Close()
 
 }

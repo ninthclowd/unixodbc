@@ -31,10 +31,11 @@ var toODBCIsoLvl = map[sql.IsolationLevel]odbc.IsolationLevel{
 }
 
 type Connection struct {
-	connector        *Connector
-	odbcConnection   odbc.Connection
-	openTX           *TX
-	cachedStatements *cache.LRU[PreparedStatement]
+	connector          *Connector
+	odbcConnection     odbc.Connection
+	openTX             *TX
+	cachedStatements   *cache.LRU[PreparedStatement]
+	uncachedStatements map[*PreparedStatement]bool //statements that are currently open and are not part of the cached statements
 }
 
 // IsValid implements driver.Validator
@@ -46,9 +47,19 @@ func (c *Connection) IsValid() bool {
 	return true
 }
 
+func (c *Connection) closeOpenStatements() error {
+	//close any uncached statements the client forgot to close
+	for ps, _ := range c.uncachedStatements {
+		if err := ps.Close(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // ResetSession implements driver.SessionResetter
 func (c *Connection) ResetSession(ctx context.Context) error {
-	return nil
+	return c.closeOpenStatements()
 }
 
 // CheckNamedValue implements driver.NamedValueChecker
@@ -63,6 +74,10 @@ func (c *Connection) CheckNamedValue(value *driver.NamedValue) error {
 
 // Close implements driver.Conn
 func (c *Connection) Close() error {
+	//close all cached open statements
+	if err := c.closeOpenStatements(); err != nil {
+		return err
+	}
 	if err := c.cachedStatements.Purge(); err != nil {
 		return err
 	}
@@ -143,6 +158,7 @@ func (c *Connection) PrepareContext(ctx context.Context, query string) (driver.S
 	})
 
 	if stmt != nil {
+		c.uncachedStatements[stmt] = true
 		Tracer.WithRegion(ctx, "Reset parameters", func() {
 			err = stmt.odbcStatement.ResetParams()
 		})
@@ -181,7 +197,9 @@ func (c *Connection) PrepareContext(ctx context.Context, query string) (driver.S
 		})
 		return nil, err
 	}
-	return &PreparedStatement{odbcStatement: st, conn: c, numInput: numParam, query: query}, nil
+	ps := &PreparedStatement{odbcStatement: st, conn: c, numInput: numParam, query: query}
+	c.uncachedStatements[ps] = true
+	return ps, nil
 }
 
 // ExecContext implements driver.ExecerContext

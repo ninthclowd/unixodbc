@@ -37,6 +37,8 @@ func cancelHandleOnContext(ctx context.Context, h *handle) (done func()) {
 
 	wg.Add(1)
 	go func() {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
 		select {
 		case <-ctx.Done():
 			_ = h.cancel()

@@ -52,10 +52,12 @@ func (r *Rows) Columns() []string {
 // Close implements driver.Rows
 func (r *Rows) Close() error {
 	errs := make(MultipleErrors)
-	Tracer.WithRegion(r.ctx, "Rows::Close", func() {
-		errs["closing recordset"] = r.odbcRecordset.Close()
-	})
-	r.odbcRecordset = nil
+	if r.odbcRecordset != nil {
+		Tracer.WithRegion(r.ctx, "Rows::Close", func() {
+			errs["closing recordset"] = r.odbcRecordset.Close()
+		})
+		r.odbcRecordset = nil
+	}
 	if r.closeStmtOnRSClose != nil {
 		errs["closing statement"] = r.closeStmtOnRSClose.Close()
 	}
