@@ -7,6 +7,7 @@ import (
 	"github.com/ninthclowd/unixodbc/internal/cache"
 	"github.com/ninthclowd/unixodbc/internal/odbc"
 	"io"
+	"runtime/trace"
 	"sync"
 )
 
@@ -57,11 +58,11 @@ func (c *Connector) initialize(ctx context.Context) (err error) {
 		return nil
 	}
 
-	ctx, trace := Tracer.NewTask(ctx, "connection::initialize")
-	defer trace.End()
+	ctx, trc := trace.NewTask(ctx, "connection::initialize")
+	defer trc.End()
 
 	if c.odbcEnvironment == nil {
-		Tracer.WithRegion(ctx, "initializing ODBC environment", func() {
+		trace.WithRegion(ctx, "initializing ODBC environment", func() {
 			c.odbcEnvironment, err = odbc.NewEnvironment()
 		})
 		if err != nil {
@@ -69,7 +70,7 @@ func (c *Connector) initialize(ctx context.Context) (err error) {
 		}
 	}
 
-	Tracer.WithRegion(ctx, "setting version", func() {
+	trace.WithRegion(ctx, "setting version", func() {
 		err = c.odbcEnvironment.SetVersion(odbc.Version380)
 	})
 	if err != nil {
@@ -77,7 +78,7 @@ func (c *Connector) initialize(ctx context.Context) (err error) {
 	}
 
 	//do not enable connection pooling at the driver level since go sql will be managing a connection pool
-	Tracer.WithRegion(ctx, "setting pool option", func() {
+	trace.WithRegion(ctx, "setting pool option", func() {
 		err = c.odbcEnvironment.SetPoolOption(odbc.PoolOff)
 	})
 	if err != nil {
@@ -90,8 +91,8 @@ func (c *Connector) initialize(ctx context.Context) (err error) {
 
 // Connect implements driver.Connector
 func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
-	ctx, trace := Tracer.NewTask(ctx, "Connect")
-	defer trace.End()
+	ctx, trc := trace.NewTask(ctx, "Connect")
+	defer trc.End()
 
 	var err error
 	if err = c.initialize(ctx); err != nil {
@@ -103,7 +104,7 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 	}
 
 	var connStr string
-	Tracer.WithRegion(ctx, "generating connection string", func() {
+	trace.WithRegion(ctx, "generating connection string", func() {
 		connStr, err = c.ConnectionString.ConnectionString(ctx)
 	})
 	if err != nil {
@@ -116,7 +117,7 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 		uncachedStatements: make(map[*PreparedStatement]bool),
 	}
 
-	Tracer.WithRegion(ctx, "connecting", func() {
+	trace.WithRegion(ctx, "connecting", func() {
 		conn.odbcConnection, err = c.odbcEnvironment.Connect(ctx, connStr)
 	})
 

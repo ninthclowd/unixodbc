@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql/driver"
 	"github.com/ninthclowd/unixodbc/internal/odbc"
+	"runtime/trace"
 )
 
 var (
@@ -55,16 +56,16 @@ func (s *PreparedStatement) ExecContext(ctx context.Context, args []driver.Named
 	if s.odbcStatement == nil {
 		return nil, odbc.ErrInvalidHandle
 	}
-	ctx, trace := Tracer.NewTask(ctx, "statement::ExecContext")
-	defer trace.End()
+	ctx, trc := trace.NewTask(ctx, "statement::ExecContext")
+	defer trc.End()
 	var err error
-	Tracer.WithRegion(ctx, "BindParams", func() {
+	trace.WithRegion(ctx, "BindParams", func() {
 		err = s.odbcStatement.BindParams(toValues(args)...)
 	})
 	if err != nil {
 		return nil, s.closeWithError(err)
 	}
-	Tracer.WithRegion(ctx, "Execute", func() {
+	trace.WithRegion(ctx, "Execute", func() {
 		err = s.odbcStatement.Execute(ctx)
 	})
 	if err != nil {
@@ -83,16 +84,16 @@ func (s *PreparedStatement) QueryContext(ctx context.Context, args []driver.Name
 	if s.odbcStatement == nil {
 		return nil, odbc.ErrInvalidHandle
 	}
-	ctx, trace := Tracer.NewTask(ctx, "statement::QueryContext")
-	defer trace.End()
+	ctx, trc := trace.NewTask(ctx, "statement::QueryContext")
+	defer trc.End()
 	var err error
-	Tracer.WithRegion(ctx, "BindParams", func() {
+	trace.WithRegion(ctx, "BindParams", func() {
 		err = s.odbcStatement.BindParams(toValues(args)...)
 	})
 	if err != nil {
 		return nil, s.closeWithError(err)
 	}
-	Tracer.WithRegion(ctx, "Execute", func() {
+	trace.WithRegion(ctx, "Execute", func() {
 		err = s.odbcStatement.Execute(ctx)
 	})
 	if err != nil {
@@ -100,11 +101,12 @@ func (s *PreparedStatement) QueryContext(ctx context.Context, args []driver.Name
 	}
 
 	var rs odbc.RecordSet
-	Tracer.WithRegion(ctx, "RecordSet", func() {
+	trace.WithRegion(ctx, "RecordSet", func() {
 		rs, err = s.odbcStatement.RecordSet()
 	})
 	if err != nil {
 		return nil, s.closeWithError(err)
 	}
+
 	return &Rows{odbcRecordset: rs, ctx: ctx}, nil
 }

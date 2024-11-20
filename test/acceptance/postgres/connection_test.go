@@ -268,12 +268,9 @@ func TestConnection_Prepare_QueryContext_Cancel(t *testing.T) {
 	}
 	cancel()
 
-	rows, err := stmt.QueryContext(ctx)
-	if err != nil {
-		t.Errorf("expected no error from subsequent query, got: %s", err.Error())
-	}
-	if !rows.Next() {
-		t.Errorf("expected a row got none")
+	_, err = stmt.QueryContext(ctx)
+	if err == nil {
+		t.Fatalf("expected an error from subsequent query, got none")
 	}
 }
 

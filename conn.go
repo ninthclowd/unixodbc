@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/ninthclowd/unixodbc/internal/cache"
 	"github.com/ninthclowd/unixodbc/internal/odbc"
+	"runtime/trace"
 	"time"
 )
 
@@ -95,8 +96,8 @@ func (c *Connection) Begin() (driver.Tx, error) {
 
 // BeginTx implements driver.ConnBeginTx
 func (c *Connection) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
-	ctx, trace := Tracer.NewTask(ctx, "BeginTx")
-	defer trace.End()
+	ctx, trc := trace.NewTask(ctx, "BeginTx")
+	defer trc.End()
 	var err error
 
 	if sqlIsoLvl := sql.IsolationLevel(opts.Isolation); sqlIsoLvl != sql.LevelDefault {
@@ -106,7 +107,7 @@ func (c *Connection) BeginTx(ctx context.Context, opts driver.TxOptions) (driver
 			return nil, fmt.Errorf("isolation level %d is not supported", opts.Isolation)
 		}
 
-		Tracer.WithRegion(ctx, "setIsolationLevel", func() {
+		trace.WithRegion(ctx, "setIsolationLevel", func() {
 			err = c.odbcConnection.SetIsolationLevel(odbcIsoLvl)
 		})
 		if err != nil {
@@ -115,7 +116,7 @@ func (c *Connection) BeginTx(ctx context.Context, opts driver.TxOptions) (driver
 	}
 
 	if opts.ReadOnly {
-		Tracer.WithRegion(ctx, "setReadOnly", func() {
+		trace.WithRegion(ctx, "setReadOnly", func() {
 			err = c.odbcConnection.SetReadOnlyMode(odbc.ModeReadOnly)
 		})
 		if err != nil {
@@ -123,7 +124,7 @@ func (c *Connection) BeginTx(ctx context.Context, opts driver.TxOptions) (driver
 		}
 	}
 
-	Tracer.WithRegion(ctx, "setAutoCommit", func() {
+	trace.WithRegion(ctx, "setAutoCommit", func() {
 		err = c.odbcConnection.SetAutoCommit(false)
 	})
 	if err != nil {
@@ -146,20 +147,20 @@ func (c *Connection) Prepare(query string) (driver.Stmt, error) {
 
 // PrepareContext implements driver.ConnPrepareContext
 func (c *Connection) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
-	ctx, trace := Tracer.NewTask(ctx, "connection::PrepareContext")
-	defer trace.End()
-	Tracer.Logf(ctx, "query", query)
+	ctx, trc := trace.NewTask(ctx, "connection::PrepareContext")
+	defer trc.End()
+	trace.Logf(ctx, "query", query)
 
 	var stmt *PreparedStatement
 	var err error
 
-	Tracer.WithRegion(ctx, "Cache lookup", func() {
+	trace.WithRegion(ctx, "Cache lookup", func() {
 		stmt = c.cachedStatements.Get(query, true)
 	})
 
 	if stmt != nil {
 		c.uncachedStatements[stmt] = true
-		Tracer.WithRegion(ctx, "Reset parameters", func() {
+		trace.WithRegion(ctx, "Reset parameters", func() {
 			err = stmt.odbcStatement.ResetParams()
 		})
 		if err != nil {
@@ -169,17 +170,17 @@ func (c *Connection) PrepareContext(ctx context.Context, query string) (driver.S
 	}
 
 	var st odbc.Statement
-	Tracer.WithRegion(ctx, "Create statement", func() {
+	trace.WithRegion(ctx, "Create statement", func() {
 		st, err = c.odbcConnection.Statement()
 	})
 	if err != nil {
 		return nil, err
 	}
-	Tracer.WithRegion(ctx, "Prepare statement", func() {
+	trace.WithRegion(ctx, "Prepare statement", func() {
 		err = st.Prepare(ctx, query)
 	})
 	if err != nil {
-		Tracer.WithRegion(ctx, "Close statement", func() {
+		trace.WithRegion(ctx, "Close statement", func() {
 			_ = st.Close()
 		})
 		return nil, err
@@ -187,12 +188,12 @@ func (c *Connection) PrepareContext(ctx context.Context, query string) (driver.S
 
 	var numParam int
 
-	Tracer.WithRegion(ctx, "Read parameter count", func() {
+	trace.WithRegion(ctx, "Read parameter count", func() {
 		numParam, err = st.NumParams()
 	})
 
 	if err != nil {
-		Tracer.WithRegion(ctx, "Close statement", func() {
+		trace.WithRegion(ctx, "Close statement", func() {
 			_ = st.Close()
 		})
 		return nil, err
@@ -204,30 +205,30 @@ func (c *Connection) PrepareContext(ctx context.Context, query string) (driver.S
 
 // ExecContext implements driver.ExecerContext
 func (c *Connection) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
-	ctx, trace := Tracer.NewTask(ctx, "connection::ExecContext")
-	defer trace.End()
-	Tracer.Logf(ctx, "query", query)
+	ctx, trc := trace.NewTask(ctx, "connection::ExecContext")
+	defer trc.End()
+	trace.Logf(ctx, "query", query)
 	var st odbc.Statement
 	var err error
 
-	Tracer.WithRegion(ctx, "Create statement", func() {
+	trace.WithRegion(ctx, "Create statement", func() {
 		st, err = c.odbcConnection.Statement()
 	})
 	if err != nil {
 		return nil, err
 	}
 	defer func() {
-		Tracer.WithRegion(ctx, "Close statement", func() {
+		trace.WithRegion(ctx, "Close statement", func() {
 			_ = st.Close()
 		})
 	}()
-	Tracer.WithRegion(ctx, "Bind parameters", func() {
+	trace.WithRegion(ctx, "Bind parameters", func() {
 		err = st.BindParams(toValues(args)...)
 	})
 	if err != nil {
 		return nil, err
 	}
-	Tracer.WithRegion(ctx, "Execute statement", func() {
+	trace.WithRegion(ctx, "Execute statement", func() {
 		err = st.ExecDirect(ctx, query)
 	})
 	if err != nil {
@@ -238,21 +239,21 @@ func (c *Connection) ExecContext(ctx context.Context, query string, args []drive
 
 // QueryContext implements driver.QueryerContext
 func (c *Connection) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
-	ctx, trace := Tracer.NewTask(ctx, "connection::QueryContext")
-	defer trace.End()
-	Tracer.Logf(ctx, "query", query)
+	ctx, trc := trace.NewTask(ctx, "connection::QueryContext")
+	defer trc.End()
+	trace.Logf(ctx, "query", query)
 
 	var st odbc.Statement
 	var err error
 
-	Tracer.WithRegion(ctx, "Create statement", func() {
+	trace.WithRegion(ctx, "Create statement", func() {
 		st, err = c.odbcConnection.Statement()
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	Tracer.WithRegion(ctx, "Bind parameters", func() {
+	trace.WithRegion(ctx, "Bind parameters", func() {
 		err = st.BindParams(toValues(args)...)
 	})
 	if err != nil {
@@ -260,7 +261,7 @@ func (c *Connection) QueryContext(ctx context.Context, query string, args []driv
 		return nil, err
 	}
 
-	Tracer.WithRegion(ctx, "Executing statement", func() {
+	trace.WithRegion(ctx, "Executing statement", func() {
 		err = st.ExecDirect(ctx, query)
 	})
 	if err != nil {
@@ -268,7 +269,7 @@ func (c *Connection) QueryContext(ctx context.Context, query string, args []driv
 		return nil, err
 	}
 	var rs odbc.RecordSet
-	Tracer.WithRegion(ctx, "Getting recordset", func() {
+	trace.WithRegion(ctx, "Getting recordset", func() {
 		rs, err = st.RecordSet()
 	})
 	if err != nil {
@@ -281,8 +282,8 @@ func (c *Connection) QueryContext(ctx context.Context, query string, args []driv
 
 // Ping implements driver.Pinger
 func (c *Connection) Ping(ctx context.Context) error {
-	ctx, trace := Tracer.NewTask(ctx, "connection::Ping")
-	defer trace.End()
+	ctx, trc := trace.NewTask(ctx, "connection::Ping")
+	defer trc.End()
 	if c.odbcConnection == nil {
 		return driver.ErrBadConn
 	}

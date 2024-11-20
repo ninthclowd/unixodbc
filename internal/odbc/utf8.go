@@ -40,17 +40,20 @@ func (c *columnUTF8) Decimal() (precision int64, scale int64, ok bool) {
 func (c *columnUTF8) Value() (driver.Value, error) {
 	value := make([]uint8, c.columnSize+1)
 	var valueLength api.SQLLEN
+	maxLen := api.SQLLEN(len(value))
 	if _, err := c.result(api.SQLGetData((*api.SQLHSTMT)(c.hnd()),
 		c.columnNumber,
 		api.SQL_C_CHAR,
 		(*api.SQLPOINTER)(unsafe.Pointer(&value[0])),
-		api.SQLLEN(len(value)),
+		maxLen,
 		&valueLength)); err != nil {
 		return nil, err
 	}
 	if valueLength == api.SQL_NULL_DATA {
 		return nil, nil
 	}
-
+	if valueLength > maxLen {
+		valueLength = maxLen
+	}
 	return string(value[:valueLength]), nil
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/ninthclowd/unixodbc/internal/odbc"
 	"io"
 	"reflect"
+	"runtime/trace"
 )
 
 var _ driver.Rows = (*Rows)(nil)
@@ -53,7 +54,7 @@ func (r *Rows) Columns() []string {
 func (r *Rows) Close() error {
 	errs := make(MultipleErrors)
 	if r.odbcRecordset != nil {
-		Tracer.WithRegion(r.ctx, "Rows::Close", func() {
+		trace.WithRegion(r.ctx, "Rows::Close", func() {
 			errs["closing recordset"] = r.odbcRecordset.Close()
 		})
 		r.odbcRecordset = nil
@@ -68,7 +69,7 @@ func (r *Rows) Close() error {
 func (r *Rows) Next(dest []driver.Value) error {
 	var more bool
 	var err error
-	Tracer.WithRegion(r.ctx, "Fetching row", func() {
+	trace.WithRegion(r.ctx, "Fetching row", func() {
 		more, err = r.odbcRecordset.Fetch()
 	})
 	if err != nil {
@@ -80,12 +81,14 @@ func (r *Rows) Next(dest []driver.Value) error {
 	}
 
 	errs := make(MultipleErrors)
-	for i := range dest {
-		col := r.odbcRecordset.Column(i)
-		Tracer.WithRegion(r.ctx, "Scanning column "+col.Name(), func() {
-			dest[i], errs[col.Name()] = col.Value()
-		})
-	}
+	trace.WithRegion(r.ctx, "Scanning row", func() {
+		for i := range dest {
+			col := r.odbcRecordset.Column(i)
+			trace.WithRegion(r.ctx, "Scanning column "+col.Name(), func() {
+				dest[i], errs[col.Name()] = col.Value()
+			})
+		}
+	})
 	return errs.Error()
 }
 
