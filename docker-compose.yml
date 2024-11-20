@@ -71,7 +71,7 @@ services:
       MSSQL_PID: Developer
       MSSQL_TCP_PORT: 1433
     healthcheck:
-      test: /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P "$${MSSQL_SA_PASSWORD}" -Q "SELECT @@version" || exit 1
+      test: /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U SA -P "$${MSSQL_SA_PASSWORD}" -Q "SELECT @@version" || exit 1
       start_period: 10s
       interval: 5s
       timeout: 5s
