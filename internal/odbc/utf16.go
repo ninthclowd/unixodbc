@@ -43,21 +43,28 @@ func (c *columnUTF16) Decimal() (precision int64, scale int64, ok bool) {
 func (c *columnUTF16) Value() (driver.Value, error) {
 	utfLength := c.columnSize * 2
 	value := make([]byte, utfLength+1)
+	maxWrite := api.SQLLEN(len(value))
 	var valueLength api.SQLLEN
 	if _, err := c.result(api.SQLGetData((*api.SQLHSTMT)(c.hnd()),
 		c.columnNumber,
 		api.SQL_C_WCHAR,
 		(*api.SQLPOINTER)(unsafe.Pointer(&value[0])),
-		api.SQLLEN(len(value)),
+		maxWrite,
 		&valueLength)); err != nil {
 		return nil, err
 	}
-	if valueLength == api.SQL_NULL_DATA {
+	if valueLength == api.SQL_NULL_DATA || valueLength < 2 {
 		return nil, nil
 	}
+	if valueLength > api.SQLLEN(utfLength) {
+		valueLength = api.SQLLEN(utfLength)
+	}
 
-	str := utf16String(value[:valueLength])
-	return str, nil
+	var utf []uint16
+	for i := 0; i < int(valueLength); i += 2 {
+		utf = append(utf, binary.LittleEndian.Uint16(value[i:i+2]))
+	}
+	return string(utf16.Decode(utf)), nil
 }
 
 //go:nocheckptr
@@ -80,12 +87,4 @@ func (s *statement) bindUTF16(index int, src string) error {
 		0,
 		nil))
 	return err
-}
-
-func utf16String(b []byte) string {
-	utf := make([]uint16, len(b)/2)
-	for i := 0; i < len(b); i += 2 {
-		utf[i/2] = binary.LittleEndian.Uint16(b[i:])
-	}
-	return string(utf16.Decode(utf))
 }
