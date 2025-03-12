@@ -69,13 +69,12 @@ func (c *columnUTF16) Value() (driver.Value, error) {
 
 //go:nocheckptr
 func (s *statement) bindUTF16(index int, src string) error {
-	nts := make([]rune, len(src)+1)
+	sz := len(src)
+	nts := make([]rune, sz+1)
 	for i, r := range src {
 		nts[i] = r
 	}
 	val := utf16.Encode(nts)
-
-	sz := unsafe.Sizeof(val)
 	_, err := s.result(api.SQLBindParameter((*api.SQLHSTMT)(s.hnd()),
 		api.SQLUSMALLINT(index+1),
 		api.SQL_PARAM_INPUT,
