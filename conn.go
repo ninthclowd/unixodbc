@@ -41,6 +41,9 @@ type Connection struct {
 
 // IsValid implements driver.Validator
 func (c *Connection) IsValid() bool {
+	if c.odbcConnection == nil {
+		return false
+	}
 	if err := c.Ping(context.Background()); err != nil {
 		return false
 	}
@@ -50,12 +53,11 @@ func (c *Connection) IsValid() bool {
 
 func (c *Connection) closeOpenStatements() error {
 	//close any uncached statements the client forgot to close
+	errs := make([]error, 0)
 	for ps, _ := range c.uncachedStatements {
-		if err := ps.Close(); err != nil {
-			return err
-		}
+		errs = append(errs, ps.Close())
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 // ResetSession implements driver.SessionResetter
@@ -76,17 +78,13 @@ func (c *Connection) CheckNamedValue(value *driver.NamedValue) error {
 // Close implements driver.Conn
 func (c *Connection) Close() error {
 	//close all cached open statements
-	if err := c.closeOpenStatements(); err != nil {
-		return err
-	}
-	if err := c.cachedStatements.Purge(); err != nil {
-		return err
-	}
-	if err := c.odbcConnection.Close(); err != nil {
-		return err
-	}
+	errs := errors.Join(
+		c.closeOpenStatements(),
+		c.cachedStatements.Purge(),
+		c.odbcConnection.Close(),
+	)
 	c.odbcConnection = nil
-	return nil
+	return errs
 }
 
 // Begin will never be called because driver.ConnBeginTx is implemented

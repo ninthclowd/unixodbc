@@ -2,6 +2,7 @@ package cache
 
 import (
 	"container/list"
+	"errors"
 	"sync"
 )
 
@@ -88,16 +89,14 @@ func (l *LRU[T]) Get(key string, removeIfFound bool) *T {
 func (l *LRU[T]) Purge() error {
 	l.mux.Lock()
 	defer l.mux.Unlock()
-
+	errs := make([]error, 0)
 	for key, element := range l.elementForKey {
 		l.elements.Remove(element)
 		delete(l.elementForKey, key)
 		node := element.Value.(*lruNode[T])
 		if l.onEvict != nil {
-			if err := l.onEvict(node.key, node.value); err != nil {
-				return err
-			}
+			errs = append(errs, l.onEvict(node.key, node.value))
 		}
 	}
-	return nil
+	return errors.Join(errs...)
 }
