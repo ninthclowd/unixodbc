@@ -2,9 +2,10 @@ package odbc
 
 import (
 	"database/sql/driver"
-	"github.com/ninthclowd/unixodbc/internal/api"
 	"reflect"
 	"unsafe"
+
+	"github.com/ninthclowd/unixodbc/internal/api"
 )
 
 const (
@@ -59,7 +60,10 @@ func (c *columnBinary) Value() (driver.Value, error) {
 	if valueLength == api.SQL_NULL_DATA {
 		return nil, nil
 	}
-	return value[:valueLength], nil
+	out := make([]byte, int(valueLength))
+	copy(out, value[:valueLength])
+	value = nil //zero out for GC
+	return out, nil
 }
 
 //go:nocheckptr

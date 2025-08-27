@@ -19,8 +19,6 @@ test-mariadb:
 
 test-postgres:
 	docker compose run --rm postgres_test
-	go tool cover -html test/acceptance/postgres/coverage.out -o test/acceptance/postgres/coverage.html
 
 test-mssql:
 	docker compose run --rm mssql_test
-	go tool cover -html test/acceptance/mssql/coverage.out -o test/acceptance/mssql/coverage.html
