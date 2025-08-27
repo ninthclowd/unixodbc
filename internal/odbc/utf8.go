@@ -2,9 +2,10 @@ package odbc
 
 import (
 	"database/sql/driver"
-	"github.com/ninthclowd/unixodbc/internal/api"
 	"reflect"
 	"unsafe"
+
+	"github.com/ninthclowd/unixodbc/internal/api"
 )
 
 func init() {
@@ -55,5 +56,7 @@ func (c *columnUTF8) Value() (driver.Value, error) {
 	if valueLength > maxLen {
 		valueLength = maxLen
 	}
-	return string(value[:valueLength]), nil
+	out := string(value[:valueLength])
+	value = nil //zero out for GC
+	return out, nil
 }

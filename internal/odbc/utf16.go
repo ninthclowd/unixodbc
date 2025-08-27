@@ -3,7 +3,6 @@ package odbc
 import "C"
 import (
 	"database/sql/driver"
-	"encoding/binary"
 	"reflect"
 	"unicode/utf16"
 	"unsafe"
@@ -61,10 +60,12 @@ func (c *columnUTF16) Value() (driver.Value, error) {
 		valueLength = api.SQLLEN(utfLength)
 	}
 
+	// convert to UTF-16
 	utf := make([]uint16, valueLength/2)
 	for i := 0; i < int(valueLength); i += 2 {
-		utf[i/2] = binary.LittleEndian.Uint16(value[i : i+2])
+		utf[i/2] = uint16(value[i]) | uint16(value[i+1])<<8
 	}
+	value = nil //zero out for GC
 	return string(utf16.Decode(utf)), nil
 }
 
