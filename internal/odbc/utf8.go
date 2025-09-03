@@ -39,24 +39,21 @@ func (c *columnUTF8) Decimal() (precision int64, scale int64, ok bool) {
 
 //go:nocheckptr
 func (c *columnUTF8) Value() (driver.Value, error) {
-	value := make([]uint8, c.columnSize+1)
-	var valueLength api.SQLLEN
-	maxLen := api.SQLLEN(len(value))
+	buffer := make([]uint8, c.columnSize+1) // add 1 for null terminator
+	var bytesWritten api.SQLLEN
+	maxWrite := api.SQLLEN(len(buffer))
 	if _, err := c.result(api.SQLGetData((*api.SQLHSTMT)(c.hnd()),
 		c.columnNumber,
 		api.SQL_C_CHAR,
-		(*api.SQLPOINTER)(unsafe.Pointer(&value[0])),
-		maxLen,
-		&valueLength)); err != nil {
+		(*api.SQLPOINTER)(unsafe.Pointer(&buffer[0])),
+		maxWrite,
+		&bytesWritten)); err != nil {
 		return nil, err
 	}
-	if valueLength == api.SQL_NULL_DATA {
+	if bytesWritten == api.SQL_NULL_DATA {
 		return nil, nil
 	}
-	if valueLength > maxLen {
-		valueLength = maxLen
-	}
-	out := string(value[:valueLength])
-	value = nil //zero out for GC
+	out := string(buffer[:bytesWritten])
+	buffer = nil //zero out for GC
 	return out, nil
 }

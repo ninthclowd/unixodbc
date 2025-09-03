@@ -47,22 +47,22 @@ func (c *columnBinary) Value() (driver.Value, error) {
 	if size == 0 {
 		size = defaultBinarySize
 	}
-	value := make([]byte, size)
-	var valueLength api.SQLLEN
+	buffer := make([]byte, size)
+	var bytesWritten api.SQLLEN
 	if _, err := c.result(api.SQLGetData((*api.SQLHSTMT)(c.hnd()),
 		c.columnNumber,
 		api.SQL_C_BINARY,
-		(*api.SQLPOINTER)(unsafe.Pointer(&value[0])),
-		api.SQLLEN(len(value)),
-		&valueLength)); err != nil {
+		(*api.SQLPOINTER)(unsafe.Pointer(&buffer[0])),
+		api.SQLLEN(len(buffer)),
+		&bytesWritten)); err != nil {
 		return nil, err
 	}
-	if valueLength == api.SQL_NULL_DATA {
+	if bytesWritten == api.SQL_NULL_DATA {
 		return nil, nil
 	}
-	out := make([]byte, int(valueLength))
-	copy(out, value[:valueLength])
-	value = nil //zero out for GC
+	out := make([]byte, int(bytesWritten))
+	copy(out, buffer[:bytesWritten])
+	buffer = nil //zero out for GC
 	return out, nil
 }
 

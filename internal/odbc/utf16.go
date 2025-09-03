@@ -41,32 +41,24 @@ func (c *columnUTF16) Decimal() (precision int64, scale int64, ok bool) {
 
 //go:nocheckptr
 func (c *columnUTF16) Value() (driver.Value, error) {
-	utfLength := c.columnSize * 2
-	value := make([]byte, utfLength+1)
-	maxWrite := api.SQLLEN(len(value))
-	var valueLength api.SQLLEN
+	buffer := make([]uint16, c.columnSize+1) // add 1 for null terminator
+	maxWrite := api.SQLLEN(len(buffer) * 2)
+	var bytesWritten api.SQLLEN
 	if _, err := c.result(api.SQLGetData((*api.SQLHSTMT)(c.hnd()),
 		c.columnNumber,
 		api.SQL_C_WCHAR,
-		(*api.SQLPOINTER)(unsafe.Pointer(&value[0])),
+		(*api.SQLPOINTER)(unsafe.Pointer(&buffer[0])),
 		maxWrite,
-		&valueLength)); err != nil {
+		&bytesWritten)); err != nil {
 		return nil, err
 	}
-	if valueLength == api.SQL_NULL_DATA || valueLength < 2 {
+	if bytesWritten == api.SQL_NULL_DATA || bytesWritten < 2 {
 		return nil, nil
 	}
-	if valueLength > api.SQLLEN(utfLength) {
-		valueLength = api.SQLLEN(utfLength)
-	}
-
-	// convert to UTF-16
-	utf := make([]uint16, valueLength/2)
-	for i := 0; i < int(valueLength); i += 2 {
-		utf[i/2] = uint16(value[i]) | uint16(value[i+1])<<8
-	}
-	value = nil //zero out for GC
-	return string(utf16.Decode(utf)), nil
+	runesWritten := bytesWritten / 2
+	out := string(utf16.Decode(buffer[:runesWritten]))
+	buffer = nil //zero out for GC
+	return out, nil
 }
 
 //go:nocheckptr
