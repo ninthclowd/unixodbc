@@ -4,6 +4,7 @@ import "C"
 import (
 	"database/sql/driver"
 	"reflect"
+	"strings"
 	"unicode/utf16"
 	"unsafe"
 
@@ -41,24 +42,52 @@ func (c *columnUTF16) Decimal() (precision int64, scale int64, ok bool) {
 
 //go:nocheckptr
 func (c *columnUTF16) Value() (driver.Value, error) {
-	buffer := make([]uint16, c.columnSize+1) // add 1 for null terminator
+	buffer := make([]uint16, c.columnSize+1)
 	maxWrite := api.SQLLEN(len(buffer) * 2)
-	var bytesWritten api.SQLLEN
+	bytesWritten := new(api.SQLLEN)
+	defer func() {
+		buffer = nil
+		bytesWritten = nil
+	}()
 	if _, err := c.result(api.SQLGetData((*api.SQLHSTMT)(c.hnd()),
 		c.columnNumber,
 		api.SQL_C_WCHAR,
 		(*api.SQLPOINTER)(unsafe.Pointer(&buffer[0])),
 		maxWrite,
-		&bytesWritten)); err != nil {
+		bytesWritten)); err != nil {
 		return nil, err
 	}
-	if bytesWritten == api.SQL_NULL_DATA || bytesWritten < 2 {
+	if *bytesWritten == api.SQL_NULL_DATA || *bytesWritten < 2 {
 		return nil, nil
 	}
-	runesWritten := bytesWritten / 2
-	out := string(utf16.Decode(buffer[:runesWritten]))
-	buffer = nil //zero out for GC
-	return out, nil
+
+	runesWritten := int(*bytesWritten / 2)
+
+	// Use strings.Builder with pre-allocated capacity
+	var builder strings.Builder
+	builder.Grow(runesWritten) // Conservative estimate
+
+	for i := 0; i < runesWritten; i++ {
+		r1 := buffer[i]
+
+		// Check for high surrogate
+		if 0xD800 <= r1 && r1 <= 0xDBFF && i+1 < runesWritten {
+			// Handle surrogate pair
+			r2 := buffer[i+1]
+			if 0xDC00 <= r2 && r2 <= 0xDFFF {
+				// Valid surrogate pair
+				r := 0x10000 + (rune(r1&0x3FF) << 10) + rune(r2&0x3FF)
+				builder.WriteRune(r)
+				i++ // Skip the low surrogate
+				continue
+			}
+		}
+
+		// Regular UTF16 code unit or invalid surrogate
+		builder.WriteRune(rune(r1))
+	}
+
+	return builder.String(), nil
 }
 
 //go:nocheckptr

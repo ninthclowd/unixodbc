@@ -48,21 +48,24 @@ func (c *columnBinary) Value() (driver.Value, error) {
 		size = defaultBinarySize
 	}
 	buffer := make([]byte, size)
-	var bytesWritten api.SQLLEN
+	bytesWritten := new(api.SQLLEN)
+	defer func() {
+		buffer = nil
+		bytesWritten = nil
+	}()
 	if _, err := c.result(api.SQLGetData((*api.SQLHSTMT)(c.hnd()),
 		c.columnNumber,
 		api.SQL_C_BINARY,
 		(*api.SQLPOINTER)(unsafe.Pointer(&buffer[0])),
 		api.SQLLEN(len(buffer)),
-		&bytesWritten)); err != nil {
+		bytesWritten)); err != nil {
 		return nil, err
 	}
-	if bytesWritten == api.SQL_NULL_DATA {
+	if *bytesWritten == api.SQL_NULL_DATA {
 		return nil, nil
 	}
-	out := make([]byte, int(bytesWritten))
-	copy(out, buffer[:bytesWritten])
-	buffer = nil //zero out for GC
+	out := make([]byte, int(*bytesWritten))
+	copy(out, buffer[:*bytesWritten])
 	return out, nil
 }
 

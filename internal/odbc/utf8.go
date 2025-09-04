@@ -3,6 +3,7 @@ package odbc
 import (
 	"database/sql/driver"
 	"reflect"
+	"strings"
 	"unsafe"
 
 	"github.com/ninthclowd/unixodbc/internal/api"
@@ -40,20 +41,30 @@ func (c *columnUTF8) Decimal() (precision int64, scale int64, ok bool) {
 //go:nocheckptr
 func (c *columnUTF8) Value() (driver.Value, error) {
 	buffer := make([]uint8, c.columnSize+1) // add 1 for null terminator
-	var bytesWritten api.SQLLEN
+	bytesWritten := new(api.SQLLEN)
+	defer func() {
+		buffer = nil
+		bytesWritten = nil
+	}()
 	maxWrite := api.SQLLEN(len(buffer))
 	if _, err := c.result(api.SQLGetData((*api.SQLHSTMT)(c.hnd()),
 		c.columnNumber,
 		api.SQL_C_CHAR,
 		(*api.SQLPOINTER)(unsafe.Pointer(&buffer[0])),
 		maxWrite,
-		&bytesWritten)); err != nil {
+		bytesWritten)); err != nil {
 		return nil, err
 	}
-	if bytesWritten == api.SQL_NULL_DATA {
+	if *bytesWritten == api.SQL_NULL_DATA {
 		return nil, nil
 	}
-	out := string(buffer[:bytesWritten])
-	buffer = nil //zero out for GC
-	return out, nil
+	var builder strings.Builder
+	builder.Grow(int(*bytesWritten))
+	for i := 0; i < int(*bytesWritten); i++ {
+		if buffer[i] == 0 {
+			break
+		}
+		builder.WriteByte(buffer[i])
+	}
+	return builder.String(), nil
 }
