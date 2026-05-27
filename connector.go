@@ -4,11 +4,12 @@ import (
 	"context"
 	"database/sql/driver"
 	"errors"
-	"github.com/ninthclowd/unixodbc/internal/cache"
-	"github.com/ninthclowd/unixodbc/internal/odbc"
 	"io"
 	"runtime/trace"
 	"sync"
+
+	"github.com/ninthclowd/unixodbc/internal/cache"
+	"github.com/ninthclowd/unixodbc/internal/odbc"
 )
 
 // StaticConnStr converts a static connection string into ConnectionStringFactory usable by Connector
@@ -72,14 +73,6 @@ func (c *Connector) initialize(ctx context.Context) (err error) {
 
 	trace.WithRegion(ctx, "setting version", func() {
 		err = c.odbcEnvironment.SetVersion(odbc.Version380)
-	})
-	if err != nil {
-		return
-	}
-
-	//do not enable connection pooling at the driver level since go sql will be managing a connection pool
-	trace.WithRegion(ctx, "setting pool option", func() {
-		err = c.odbcEnvironment.SetPoolOption(odbc.PoolOff)
 	})
 	if err != nil {
 		return

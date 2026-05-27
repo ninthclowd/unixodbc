@@ -4,8 +4,9 @@ import "C"
 import (
 	"context"
 	"fmt"
-	"github.com/ninthclowd/unixodbc/internal/api"
 	"unicode/utf16"
+
+	"github.com/ninthclowd/unixodbc/internal/api"
 )
 
 type PoolOption uint64
@@ -33,6 +34,10 @@ type Environment interface {
 }
 
 func NewEnvironment() (Environment, error) {
+	if err := setProcessConnectionPooling(PoolOff); err != nil {
+		return nil, err
+	}
+
 	hnd, err := newEnvHandle()
 	if err != nil {
 		return nil, err
@@ -41,6 +46,18 @@ func NewEnvironment() (Environment, error) {
 	e := &environment{handle: hnd}
 
 	return e, nil
+}
+
+func setProcessConnectionPooling(option PoolOption) error {
+	if code := api.SQLSetEnvAttr(
+		nil,
+		api.SQL_ATTR_CONNECTION_POOLING,
+		api.Const(uint64(option)),
+		api.SQL_IS_UINTEGER,
+	); code != api.SQL_SUCCESS {
+		return fmt.Errorf("setting process connection pooling: received code %d", code)
+	}
+	return nil
 }
 
 var _ Environment = (*environment)(nil)

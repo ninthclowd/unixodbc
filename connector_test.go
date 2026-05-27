@@ -26,7 +26,6 @@ func TestConnector_Connect(t *testing.T) {
 	ctx := context.Background()
 
 	mockEnv.EXPECT().SetVersion(odbc.Version380).Return(nil).Times(1)
-	mockEnv.EXPECT().SetPoolOption(odbc.PoolOff).Return(nil).Times(1)
 
 	mockConn1 := mocks.NewMockConnection(ctrl)
 	mockConn1.EXPECT().SetAutoCommit(true).Return(nil).Times(1)
@@ -87,7 +86,6 @@ func TestConnector_Connect_ClosesConnectionOnSetAutoCommitError(t *testing.T) {
 	wantErr := errors.New("autocommit failed")
 
 	mockEnv.EXPECT().SetVersion(odbc.Version380).Return(nil).Times(1)
-	mockEnv.EXPECT().SetPoolOption(odbc.PoolOff).Return(nil).Times(1)
 
 	mockConn := mocks.NewMockConnection(ctrl)
 	mockEnv.EXPECT().Connect(gomock.Any(), connString).Return(mockConn, nil).Times(1)

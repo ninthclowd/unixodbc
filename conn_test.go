@@ -19,7 +19,6 @@ func testDBConnection(t *testing.T, cacheSize int) (ctrl *gomock.Controller, con
 	mockEnv := mocks.NewMockEnvironment(ctrl)
 
 	mockEnv.EXPECT().SetVersion(odbc.Version380).Return(nil).Times(1)
-	mockEnv.EXPECT().SetPoolOption(odbc.PoolOff).Return(nil).Times(1)
 
 	connString := "connString"
 
