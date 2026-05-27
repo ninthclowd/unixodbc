@@ -2,6 +2,7 @@ package unixodbc
 
 import (
 	"context"
+	"errors"
 	"github.com/golang/mock/gomock"
 	"github.com/ninthclowd/unixodbc/internal/mocks"
 	"github.com/ninthclowd/unixodbc/internal/odbc"
@@ -68,4 +69,36 @@ func TestConnector_Connect(t *testing.T) {
 		t.Errorf("second connection reference was unexpected, got %v", c.odbcConnection)
 	}
 
+}
+
+func TestConnector_Connect_ClosesConnectionOnSetAutoCommitError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockEnv := mocks.NewMockEnvironment(ctrl)
+
+	connString := "connString"
+	connector := &Connector{
+		ConnectionString: StaticConnStr(connString),
+		odbcEnvironment:  mockEnv,
+	}
+
+	ctx := context.Background()
+	wantErr := errors.New("autocommit failed")
+
+	mockEnv.EXPECT().SetVersion(odbc.Version380).Return(nil).Times(1)
+	mockEnv.EXPECT().SetPoolOption(odbc.PoolOff).Return(nil).Times(1)
+
+	mockConn := mocks.NewMockConnection(ctrl)
+	mockEnv.EXPECT().Connect(gomock.Any(), connString).Return(mockConn, nil).Times(1)
+	mockConn.EXPECT().SetAutoCommit(true).Return(wantErr).Times(1)
+	mockConn.EXPECT().Close().Return(nil).Times(1)
+
+	gotConn, err := connector.Connect(ctx)
+	if gotConn != nil {
+		t.Fatalf("expected no connection on error, got %v", gotConn)
+	}
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("expected error %v, got %v", wantErr, err)
+	}
 }

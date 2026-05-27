@@ -125,7 +125,7 @@ func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 		return nil, err
 	}
 	if err = conn.odbcConnection.SetAutoCommit(true); err != nil {
-		return nil, err
+		return nil, errors.Join(err, conn.odbcConnection.Close())
 	}
 
 	return conn, nil
