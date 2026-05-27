@@ -162,7 +162,8 @@ func (c *Connection) PrepareContext(ctx context.Context, query string) (driver.S
 			err = stmt.odbcStatement.ResetParams()
 		})
 		if err != nil {
-			return nil, err
+			delete(c.uncachedStatements, stmt)
+			return nil, stmt.closeWithError(err)
 		}
 		return stmt, nil
 	}

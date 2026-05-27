@@ -84,6 +84,12 @@ func (c *connection) Statement() (Statement, error) {
 	}
 
 	if err := stmt.SetConcurrency(ConcurrencyLock); err != nil {
+		if freeErr := hnd.free(); freeErr != nil {
+			return nil, errors.Join(
+				fmt.Errorf("setting concurrency lock: %w", err),
+				fmt.Errorf("freeing statement handle after failed setup: %w", freeErr),
+			)
+		}
 		return nil, fmt.Errorf("setting concurrency lock: %w", err)
 	}
 

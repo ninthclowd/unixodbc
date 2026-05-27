@@ -55,6 +55,10 @@ func (l *LRU[T]) Put(key string, value *T) error {
 	defer l.mux.Unlock()
 	if element, ok := l.elementForKey[key]; ok {
 		l.elements.MoveToFront(element)
+		node := element.Value.(*lruNode[T])
+		if node.value != value && l.onEvict != nil {
+			return l.onEvict(key, value)
+		}
 		return nil
 	}
 	if l.capacity == len(l.elementForKey) {

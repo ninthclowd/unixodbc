@@ -19,7 +19,6 @@ func testDBConnection(t *testing.T, cacheSize int) (ctrl *gomock.Controller, con
 	mockEnv := mocks.NewMockEnvironment(ctrl)
 
 	mockEnv.EXPECT().SetVersion(odbc.Version380).Return(nil).Times(1)
-	mockEnv.EXPECT().SetPoolOption(odbc.PoolOff).Return(nil).Times(1)
 
 	connString := "connString"
 
@@ -325,6 +324,45 @@ func TestConnection_PrepareContext(t *testing.T) {
 
 	conn.Close()
 
+}
+
+func TestConnection_PrepareContext_ClosesCachedStatementOnResetParamsError(t *testing.T) {
+	ctrl, conn, mockConn := testConnection(t, 1)
+	defer ctrl.Finish()
+
+	q := "SELECT * FROM foo WHERE bar = ?"
+	wantErr := errors.New("reset failed")
+
+	ctx := context.Background()
+	mockStmt := mocks.NewMockStatement(ctrl)
+
+	mockStmt.EXPECT().Prepare(gomock.Any(), q).Return(nil).Times(1)
+	mockStmt.EXPECT().NumParams().Return(1, nil).Times(1)
+	mockConn.EXPECT().Statement().Return(mockStmt, nil).Times(1)
+
+	stmt, err := conn.PrepareContext(ctx, q)
+	if err != nil {
+		t.Fatalf("expected no error from prepareContext but got %v", err)
+	}
+	if err = stmt.Close(); err != nil {
+		t.Fatalf("expected no error closing statement into cache, got %v", err)
+	}
+
+	mockStmt.EXPECT().ResetParams().Return(wantErr).Times(1)
+	mockStmt.EXPECT().Close().Return(nil).Times(1)
+
+	gotStmt, err := conn.PrepareContext(ctx, q)
+	if gotStmt != nil {
+		t.Fatalf("expected no statement on reset failure, got %v", gotStmt)
+	}
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("expected error %v, got %v", wantErr, err)
+	}
+
+	mockConn.EXPECT().Close().Return(nil).Times(1)
+	if err = conn.Close(); err != nil {
+		t.Fatalf("expected no error closing connection, got %v", err)
+	}
 }
 
 func TestConnection_ExecContext(t *testing.T) {

@@ -86,6 +86,37 @@ func TestLRU_Put_Redundant(t *testing.T) {
 	}
 }
 
+func TestLRU_Put_DuplicateKey_EvictsIncomingValue(t *testing.T) {
+	type NonEmptyStruct struct {
+		value int
+	}
+
+	cachedValue := NonEmptyStruct{value: 1}
+	incomingValue := NonEmptyStruct{value: 2}
+	evictions := make(map[string]*NonEmptyStruct)
+
+	lru := cache.NewLRU[NonEmptyStruct](1, func(key string, value *NonEmptyStruct) error {
+		evictions[key] = value
+		return nil
+	})
+
+	if gotErr := lru.Put("A", &cachedValue); gotErr != nil {
+		t.Fatalf("expected no error but received: %v", gotErr)
+	}
+
+	if gotErr := lru.Put("A", &incomingValue); gotErr != nil {
+		t.Fatalf("expected no error but received: %v", gotErr)
+	}
+
+	if gotValue := evictions["A"]; gotValue != &incomingValue {
+		t.Fatalf("expected incoming value to be evicted, got %v", gotValue)
+	}
+
+	if gotValue := lru.Get("A", false); gotValue != &cachedValue {
+		t.Fatalf("expected cached value to remain, got %v", gotValue)
+	}
+}
+
 func TestLRU_Purge(t *testing.T) {
 	var itemA, itemB MyStruct
 	evictions := make(map[string]*MyStruct)
